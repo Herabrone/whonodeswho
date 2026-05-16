@@ -1,0 +1,12 @@
+/** Small id / timestamp helpers used by store actions. */
+
+export function newId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function nowIso(): string {
+  return new Date().toISOString();
+}
