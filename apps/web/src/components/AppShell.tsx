@@ -8,6 +8,7 @@ import { Legend } from "./Legend";
 import { TimelineToggleButton } from "./TimelineToggleButton";
 import { useGraphStore } from "../store/useGraphStore";
 import { useAuth } from "../auth/AuthContext";
+import { dispatchOpenImportExport } from "../features/crud/relationshipComposerEvent";
 
 interface AppShellProps {
   canvas: ReactNode;
@@ -137,6 +138,14 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
               Dark
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => dispatchOpenImportExport()}
+            className="rounded-lg border border-rf-border bg-rf-base px-3 py-1 text-sm text-rf-text hover:bg-rf-surface"
+          >
+            Import / Export
+          </button>
+
           <button
             onClick={signOut}
             className="text-xs font-medium text-rf-muted transition-colors hover:text-rf-text"

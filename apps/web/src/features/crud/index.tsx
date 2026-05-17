@@ -18,6 +18,7 @@ import type {
 import {
   OPEN_RELATIONSHIP_COMPOSER_EVENT,
   type OpenRelationshipComposerDetail,
+  OPEN_IMPORT_EXPORT_EVENT,
 } from "./relationshipComposerEvent";
 import { YearMonthPicker } from "../timeline/YearMonthPicker";
 import useAutoRelationships, { createRelationshipKey } from "./useAutoRelationships";
@@ -60,6 +61,8 @@ const PERSON_COLORS = [
   "#1098ad",
   "#7b2cbf",
 ];
+
+const DEFAULT_EXPORT_NAME = "my-network";
 
 function capitalizeWords(value: string): string {
   return value
@@ -171,6 +174,7 @@ export function CrudFeature() {
   const [importMessage, setImportMessage] = useState("");
   const [personDraft, setPersonDraft] = useState<PersonDraft>(initialPersonDraft());
   const [personError, setPersonError] = useState("");
+  const [exportFileName, setExportFileName] = useState<string>(DEFAULT_EXPORT_NAME);
   const [relationshipDraft, setRelationshipDraft] = useState<RelationshipDraft>(initialRelationshipDraft());
   const [relationshipError, setRelationshipError] = useState("");
   const [endConfirmId, setEndConfirmId] = useState<string | null>(null);
@@ -257,10 +261,20 @@ export function CrudFeature() {
     };
 
     window.addEventListener(OPEN_RELATIONSHIP_COMPOSER_EVENT, onOpenComposer);
+    const onOpenImportExport = () => setModal({ type: "import-export" });
+    window.addEventListener(OPEN_IMPORT_EXPORT_EVENT, onOpenImportExport);
+
     return () => {
       window.removeEventListener(OPEN_RELATIONSHIP_COMPOSER_EVENT, onOpenComposer);
+      window.removeEventListener(OPEN_IMPORT_EXPORT_EVENT, onOpenImportExport);
     };
   }, []);
+
+  function sanitizeFileName(name: string) {
+    if (!name) return "";
+    // Allow letters, numbers, dash, underscore. Strip everything else.
+    return name.replace(/[^a-zA-Z0-9-_]/g, "").trim();
+  }
 
   const openRelationshipEdit = (relationship: Relationship) => {
     setRelationshipDraft(initialRelationshipDraft(relationship));
@@ -427,7 +441,8 @@ export function CrudFeature() {
 
   const exportJson = () => {
     const graph: GraphData = { people, relationships };
-    downloadTextFile("whonodeswho-graph.json", JSON.stringify(graph, null, 2), "application/json");
+    const base = sanitizeFileName(exportFileName) || DEFAULT_EXPORT_NAME;
+    downloadTextFile(`${base}.json`, JSON.stringify(graph, null, 2), "application/json");
   };
 
   const exportPeopleCsv = () => {
@@ -442,7 +457,8 @@ export function CrudFeature() {
         p.updatedAt,
       ]),
     );
-    downloadTextFile("whonodeswho-people.csv", csv, "text/csv");
+    const base = sanitizeFileName(exportFileName) || DEFAULT_EXPORT_NAME;
+    downloadTextFile(`${base}-people.csv`, csv, "text/csv");
   };
 
   const exportRelationshipsCsv = () => {
@@ -480,7 +496,8 @@ export function CrudFeature() {
         r.updatedAt,
       ]),
     );
-    downloadTextFile("whonodeswho-relationships.csv", csv, "text/csv");
+    const base = sanitizeFileName(exportFileName) || DEFAULT_EXPORT_NAME;
+    downloadTextFile(`${base}-relationships.csv`, csv, "text/csv");
   };
 
   const importJsonFile = async (file: File) => {
@@ -539,13 +556,7 @@ export function CrudFeature() {
           >
             + Relationship
           </button>
-          <button
-            type="button"
-            onClick={() => setModal({ type: "import-export" })}
-            className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
-          >
-            Import / Export
-          </button>
+          
         </div>
       </div>
 
@@ -1103,6 +1114,18 @@ export function CrudFeature() {
               >
                 x
               </button>
+            </div>
+
+            <div className="mb-3">
+              <label className="block text-sm text-rf-text">
+                File name
+                <input
+                  value={exportFileName}
+                  onChange={(e) => setExportFileName(e.target.value)}
+                  placeholder={DEFAULT_EXPORT_NAME}
+                  className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
+                />
+              </label>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

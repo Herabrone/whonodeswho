@@ -92,9 +92,9 @@ export function IntelligenceFeature() {
 
   return (
     <>
-       <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 w-[860px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
-         <div className="pointer-events-auto rounded-xl border border-rf-border bg-rf-surface p-3 shadow-lg backdrop-blur">
-          <div className="flex flex-wrap items-center gap-2">
+       <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 w-[720px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
+         <div className="pointer-events-auto rounded-xl border border-rf-border bg-rf-surface p-2 shadow-lg backdrop-blur">
+          <div className="flex flex-wrap items-center gap-1">
             <div className="flex items-center gap-2">
               <select
                 value={focusPersonId ?? ""}
@@ -159,24 +159,19 @@ export function IntelligenceFeature() {
               Degrees between people
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                clearPath();
-                setPathMessage("");
-              }}
-              className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
-            >
-              Clear path
-            </button>
+            {/* Clear path button removed (use inline controls instead) */}
           </div>
+          {focusPersonId && focusedPersonName ? (
+            <div className="mt-1 text-xs text-rf-muted">
+              {`Showing ${focusedPersonName} + ${Math.max(focusCount - 1, 0)} people within ${String(
+                focusDegrees,
+              )} degree(s).`}
+            </div>
+          ) : null}
+          {pathMessage && <div className="mt-1 text-xs text-rf-muted">{pathMessage}</div>}
+         </div>
+       </div>
 
-           <div className="mt-2 text-xs text-rf-muted">
-             {focusPersonId && focusedPersonName
-               ? `Showing ${focusedPersonName} + ${Math.max(focusCount - 1, 0)} people within ${String(focusDegrees)} degree(s).`
-               : "Focus mode is off."}
-           </div>
-           {pathMessage && <div className="mt-1 text-xs text-rf-muted">{pathMessage}</div>}
       {pathPersonIds.length > 0 && (
         <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 w-[860px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
           <div className="pointer-events-auto rounded-xl border border-rf-border bg-rf-surface p-3 shadow-lg">
@@ -190,16 +185,7 @@ export function IntelligenceFeature() {
                 <li key={hop}>{hop}</li>
               ))}
             </ul>
-            <button
-              type="button"
-              onClick={() => {
-                clearPath();
-                setPathMessage("");
-              }}
-              className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-1.5 text-xs text-rf-text hover:bg-rf-base"
-            >
-              Clear path
-            </button>
+            {/* Clear path button removed; clearing handled in primary controls */}
           </div>
         </div>
       )}

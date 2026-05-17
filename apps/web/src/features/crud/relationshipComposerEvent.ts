@@ -13,3 +13,9 @@ export function dispatchOpenRelationshipComposer(detail: OpenRelationshipCompose
     ),
   );
 }
+
+export const OPEN_IMPORT_EXPORT_EVENT = "whonodeswho:open-import-export";
+
+export function dispatchOpenImportExport(): void {
+  window.dispatchEvent(new CustomEvent(OPEN_IMPORT_EXPORT_EVENT));
+}
