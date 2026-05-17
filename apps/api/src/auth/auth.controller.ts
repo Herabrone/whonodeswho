@@ -68,4 +68,20 @@ export class AuthController {
     response.clearCookie('relationflow.sid');
     return { user: null };
   }
+
+  /** Dev-only shortcut — disabled in production. */
+  @Post('dev-login')
+  async devLogin(
+    @Req() request: SessionRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthSessionResponse> {
+    if (process.env['NODE_ENV'] === 'production') {
+      response.status(404);
+      return { user: null };
+    }
+
+    const user = await this.authService.devLogin();
+    request.session.userId = user.id;
+    return { user };
+  }
 }
