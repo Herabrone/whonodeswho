@@ -24,7 +24,9 @@ import {
 } from "./relationshipComposerEvent";
 import { YearMonthPicker } from "../timeline/YearMonthPicker";
 import { RelationshipTransitionDialog } from "../timeline/RelationshipTransitionDialog";
+import { RelationshipHistoryPanel } from "../timeline/RelationshipHistoryPanel";
 import { validateRelationshipDrafts } from "../../domain/rules/validationRules";
+import { makeThreadId } from "../../domain/timeline/timelineTypes";
 import { createRelationshipKey, inferAutoRelationships } from "./useAutoRelationships";
 import ConfirmRelationshipsDialog, { ProposalItem } from "./ConfirmRelationshipsDialog";
 import QuickAddRelationshipsDialog from "./QuickAddRelationshipsDialog";
@@ -72,6 +74,33 @@ const PERSON_COLORS = [
 
 const DEFAULT_EXPORT_NAME = "my-network";
 
+function relationshipDebugSnapshot(relationship: Relationship | undefined | null) {
+  if (!relationship) return null;
+
+  return {
+    id: relationship.id,
+    source: relationship.source,
+    target: relationship.target,
+    type: relationship.type,
+    isActive: relationship.isActive,
+    startYear: relationship.startYear,
+    startMonth: relationship.startMonth,
+    endYear: relationship.endYear,
+    autoCreatedReciprocalOfId: relationship.autoCreatedReciprocalOfId,
+  };
+}
+
+function logRelationshipDebug(label: string, payload?: unknown) {
+  if (!import.meta.env.DEV) return;
+
+  if (payload === undefined) {
+    console.debug(`[relationships] ${label}`);
+    return;
+  }
+
+  console.debug(`[relationships] ${label}`, payload);
+}
+
 function proposalKey(proposal: Pick<ProposalItem, "source" | "target" | "type">): string {
   return createRelationshipKey(proposal.source, proposal.target, proposal.type);
 }
@@ -83,6 +112,11 @@ function proposalToRelationshipInput(proposal: ProposalItem): RelationshipInput 
     category: proposal.category,
     type: proposal.type,
     direction: proposal.direction,
+    startYear: proposal.startYear,
+    startMonth: proposal.startMonth,
+    endYear: proposal.endYear,
+    isActive: proposal.isActive,
+    color: proposal.color,
     notes: proposal.notes || undefined,
   };
 }
@@ -192,7 +226,10 @@ export function CrudFeature() {
   const [relationshipError, setRelationshipError] = useState("");
   const [endConfirmId, setEndConfirmId] = useState<string | null>(null);
   const [endConfirmYear, setEndConfirmYear] = useState<number>(new Date().getFullYear());
-  const [transitionThreadId, setTransitionThreadId] = useState<string | null>(null);
+  const [transitionContext, setTransitionContext] = useState<{
+    threadId: string;
+    relationshipId: string;
+  } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPrimary, setConfirmPrimary] = useState<ProposalItem | null>(null);
   const [confirmProposals, setConfirmProposals] = useState<ProposalItem[]>([]);
@@ -207,6 +244,8 @@ export function CrudFeature() {
 
   const people = useGraphStore((s) => s.people);
   const relationships = useGraphStore((s) => s.relationships);
+  const episodes = useGraphStore((s) => s.episodes);
+  const events = useGraphStore((s) => s.events);
   const selectedPersonId = useGraphStore((s) => s.selectedPersonId);
   const selectedRelationshipId = useGraphStore((s) => s.selectedRelationshipId);
   const selectedPerson = useMemo(
@@ -249,6 +288,40 @@ export function CrudFeature() {
   const clearSelection = useGraphStore((s) => s.clearSelection);
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
+  const canonicalSelectedRelationship = useMemo(() => {
+    if (!selectedRelationship) return null;
+    if (!selectedRelationship.autoCreatedReciprocalOfId) return selectedRelationship;
+
+    return (
+      relationships.find(
+        (relationship) => relationship.id === selectedRelationship.autoCreatedReciprocalOfId,
+      ) ?? selectedRelationship
+    );
+  }, [relationships, selectedRelationship]);
+  const selectedThreadId = useMemo(
+    () =>
+      canonicalSelectedRelationship
+        ? makeThreadId(
+            canonicalSelectedRelationship.source,
+            canonicalSelectedRelationship.target,
+          )
+        : null,
+    [canonicalSelectedRelationship],
+  );
+  const selectedThreadEpisodes = useMemo(() => {
+    if (!selectedThreadId) return [];
+
+    return Object.values(episodes)
+      .filter((episode) => episode.threadId === selectedThreadId)
+      .sort((left, right) => left.startDate.localeCompare(right.startDate));
+  }, [episodes, selectedThreadId]);
+  const selectedThreadEvents = useMemo(() => {
+    if (!selectedThreadId) return [];
+
+    return Object.values(events)
+      .filter((event) => event.threadId === selectedThreadId)
+      .sort((left, right) => left.date.localeCompare(right.date));
+  }, [events, selectedThreadId]);
 
   const openPersonCreate = () => {
     setPersonDraft(initialPersonDraft());
@@ -327,6 +400,11 @@ export function CrudFeature() {
       }, 0);
     }
   }, [modal.type]);
+
+  useEffect(() => {
+    if (!canonicalSelectedRelationship) return;
+    ensureLegacyRelationshipMigrated(canonicalSelectedRelationship);
+  }, [canonicalSelectedRelationship, ensureLegacyRelationshipMigrated]);
 
   const rememberDeclinedProposals = (proposals: ProposalItem[]) => {
     if (proposals.length === 0) return;
@@ -407,6 +485,11 @@ export function CrudFeature() {
     }
 
     if (modal.type === "relationship-edit") {
+      logRelationshipDebug("submitRelationship:edit", {
+        relationshipId: modal.relationship.id,
+        existing: relationshipDebugSnapshot(modal.relationship),
+        payload,
+      });
       updateRelationship(modal.relationship.id, payload);
       closeModal();
     } else {
@@ -429,7 +512,8 @@ export function CrudFeature() {
         addRelationship(payload);
         closeModal();
       } else {
-        setConfirmPrimary(payload as ProposalItem);
+        const primaryProposal: ProposalItem = { ...payload };
+        setConfirmPrimary(primaryProposal);
         setConfirmProposals(proposals.map((p) => ({ ...p })));
         setConfirmWarnings(warnings);
         setConfirmOpen(true);
@@ -610,7 +694,7 @@ export function CrudFeature() {
 
       {(selectedPerson || selectedRelationship) && (
         <div className="pointer-events-none absolute right-0 top-0 z-30 h-full w-[360px] max-w-[92vw]">
-          <div className="pointer-events-auto h-full border-l border-rf-border bg-rf-surface p-4 shadow-xl">
+          <div className="pointer-events-auto h-full overflow-y-auto border-l border-rf-border bg-rf-surface p-4 shadow-xl">
             {selectedPerson && (
               <div>
                 <div className="mb-4 flex items-center justify-between">
@@ -779,6 +863,12 @@ export function CrudFeature() {
                   </div>
                 </dl>
 
+                <RelationshipHistoryPanel
+                  episodes={selectedThreadEpisodes}
+                  events={selectedThreadEvents}
+                  relationshipColors={relationshipColors}
+                />
+
                 <div className="mt-4 flex gap-2">
                   <button
                     type="button"
@@ -806,35 +896,28 @@ export function CrudFeature() {
                           isActive: true,
                           endYear: undefined,
                         });
-                        setEndConfirmId(null);
                       }}
                       className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
                     >
                       Reactivate
                     </button>
                   ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const { threadId } = ensureLegacyRelationshipMigrated(selectedRelationship);
-                          setTransitionThreadId(threadId);
-                        }}
-                        className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
-                      >
-                        Change relationship
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEndConfirmId(selectedRelationship.id);
-                          setEndConfirmYear(new Date().getFullYear());
-                        }}
-                        className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm text-red-700"
-                      >
-                        End this relationship
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        logRelationshipDebug("transitionDialog:open", {
+                          selectedRelationship: relationshipDebugSnapshot(selectedRelationship),
+                        });
+                        const { threadId } = ensureLegacyRelationshipMigrated(selectedRelationship);
+                        setTransitionContext({
+                          threadId,
+                          relationshipId: selectedRelationship.id,
+                        });
+                      }}
+                      className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
+                    >
+                      Update relationship
+                    </button>
                   )}
                 </div>
                 {selectedRelationship.isActive !== false && endConfirmId === selectedRelationship.id ? (
@@ -892,10 +975,11 @@ export function CrudFeature() {
         </div>
       )}
 
-      {transitionThreadId && (
+      {transitionContext && (
         <RelationshipTransitionDialog
-          threadId={transitionThreadId}
-          onClose={() => setTransitionThreadId(null)}
+          threadId={transitionContext.threadId}
+          relationshipId={transitionContext.relationshipId}
+          onClose={() => setTransitionContext(null)}
         />
       )}
 

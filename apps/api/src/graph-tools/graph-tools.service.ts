@@ -31,6 +31,10 @@ interface CreateRelationshipInput {
   toPersonId: string;
   relationshipType: string;
   notes?: string;
+  startYear?: number;
+  startMonth?: number;
+  endYear?: number;
+  isActive?: boolean;
 }
 
 interface ValidationResult {
@@ -348,12 +352,20 @@ export class GraphToolsService {
     toPersonId: string,
     relationshipType: string,
     notes?: string,
+    startYear?: number,
+    startMonth?: number,
+    endYear?: number,
+    isActive?: boolean,
   ): Promise<PendingAction> {
     const validation = await this.validateCreateRelationship(userId, {
       fromPersonId,
       toPersonId,
       relationshipType,
       notes,
+      startYear,
+      startMonth,
+      endYear,
+      isActive,
     });
 
     return {
@@ -367,6 +379,10 @@ export class GraphToolsService {
         relationshipType: validation.relationshipType,
         category: validation.category,
         direction: validation.direction,
+        ...(startYear === undefined ? {} : { startYear }),
+        ...(startMonth === undefined ? {} : { startMonth }),
+        ...(endYear === undefined ? {} : { endYear }),
+        ...(isActive === undefined ? {} : { isActive }),
         ...(notes ? { notes } : {}),
       },
     };
@@ -382,6 +398,10 @@ export class GraphToolsService {
       toPersonId: action.payload.toPersonId,
       relationshipType: action.payload.relationshipType,
       notes: action.payload.notes,
+      startYear: action.payload.startYear,
+      startMonth: action.payload.startMonth,
+      endYear: action.payload.endYear,
+      isActive: action.payload.isActive,
     });
   }
 
@@ -436,6 +456,10 @@ export class GraphToolsService {
         type: action.payload.relationshipType,
         category: action.payload.category,
         direction: action.payload.direction,
+        startYear: action.payload.startYear ?? null,
+        startMonth: action.payload.startMonth ?? null,
+        endYear: action.payload.endYear ?? null,
+        isActive: action.payload.isActive ?? null,
         notes: action.payload.notes ?? null,
         createdAt: now,
         updatedAt: now,
@@ -459,6 +483,36 @@ export class GraphToolsService {
 
     if (!isAllowedRelationshipType(input.relationshipType)) {
       throw new BadRequestException('Relationship type is not allowed.');
+    }
+
+    if (input.startYear !== undefined && !Number.isInteger(input.startYear)) {
+      throw new BadRequestException('Start year must be a whole number.');
+    }
+
+    if (input.startMonth !== undefined && !Number.isInteger(input.startMonth)) {
+      throw new BadRequestException('Start month must be a whole number.');
+    }
+
+    if (input.startMonth !== undefined && (input.startMonth < 1 || input.startMonth > 12)) {
+      throw new BadRequestException('Start month must be between 1 and 12.');
+    }
+
+    if (input.startMonth !== undefined && input.startYear === undefined) {
+      throw new BadRequestException('Start month requires a start year.');
+    }
+
+    if (input.endYear !== undefined && !Number.isInteger(input.endYear)) {
+      throw new BadRequestException('End year must be a whole number.');
+    }
+
+    if (
+      input.startYear !== undefined &&
+      input.endYear !== undefined &&
+      input.endYear < input.startYear
+    ) {
+      throw new BadRequestException(
+        'End year cannot be earlier than the start year.',
+      );
     }
 
     const [fromPerson, toPerson, existingRelationships] = await Promise.all([

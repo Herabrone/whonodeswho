@@ -21,6 +21,11 @@ export interface TransitionOutcome {
   /** The date at which the transition occurred (ISO date, YYYY-MM-DD). */
   transitionDate: string;
   /**
+   * Optional start date for the episode being closed, if it needs correction.
+   * If provided, the closed episode's startDate will be updated to this value.
+   */
+  correctedStartDate?: string;
+  /**
    * A new episode to open at the transition date, if the relationship
    * continues in a different form.
    */
@@ -62,6 +67,7 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
       label: "Broke up",
       description: "The relationship ended. No ongoing connection.",
       endsKind: "romantic_partner",
+      startsKind: "ex_partner",
     },
   ],
 
@@ -79,6 +85,7 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
       label: "Divorced",
       description: "The marriage ended. No ongoing connection.",
       endsKind: "spouse",
+      startsKind: "ex_partner",
     },
   ],
 

@@ -198,6 +198,24 @@ export const GRAPH_TOOL_SCHEMAS: OpenAI.Chat.Completions.ChatCompletionTool[] =
                 'unknown',
               ],
             },
+            startYear: {
+              type: 'integer',
+              description: 'Year when the relationship started.',
+            },
+            startMonth: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 12,
+              description: 'Optional month when the relationship started (1-12).',
+            },
+            endYear: {
+              type: 'integer',
+              description: 'Optional year when the relationship ended.',
+            },
+            isActive: {
+              type: 'boolean',
+              description: 'Whether the relationship is currently active.',
+            },
             notes: { type: 'string' },
           },
           required: ['fromPersonId', 'toPersonId', 'relationshipType'],

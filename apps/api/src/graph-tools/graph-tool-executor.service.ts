@@ -80,6 +80,10 @@ export class GraphToolExecutorService {
     toPersonId: string,
     relationshipType: string,
     notes?: string,
+    startYear?: number,
+    startMonth?: number,
+    endYear?: number,
+    isActive?: boolean,
   ): Promise<ToolResponse<{ pendingAction: PendingAction }>> {
     return this.wrap(async () => ({
       pendingAction: await this.graphTools.proposeCreateRelationship(
@@ -88,6 +92,10 @@ export class GraphToolExecutorService {
         toPersonId,
         relationshipType,
         notes,
+        startYear,
+        startMonth,
+        endYear,
+        isActive,
       ),
     }));
   }

@@ -357,6 +357,113 @@ describe("useGraphStore http persistence", () => {
     expect(useGraphStore.getState().relationships).toHaveLength(0);
   });
 
+  it("syncs legacy relationship fields after a transition and only updates the targeted relationship", () => {
+    const threadId = "thread:alice:bob";
+    useGraphStore.setState({
+      people: [
+        {
+          id: "alice",
+          name: "Alice",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+        {
+          id: "bob",
+          name: "Bob",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+      relationships: [
+        {
+          id: "r1",
+          source: "alice",
+          target: "bob",
+          type: "partner",
+          category: "romantic",
+          direction: "two-way",
+          startYear: 2015,
+          startMonth: 6,
+          isActive: true,
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+        {
+          id: "r2",
+          source: "bob",
+          target: "alice",
+          type: "child",
+          category: "family",
+          direction: "one-way",
+          autoCreatedReciprocalOfId: "r-parent",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+      threads: {
+        [threadId]: {
+          id: threadId,
+          personAId: "alice",
+          personBId: "bob",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+      episodes: {
+        "episode:r1": {
+          id: "episode:r1",
+          threadId,
+          kind: "romantic_partner",
+          startDate: "2015-06-01",
+          certainty: "approximate",
+          source: "imported",
+        },
+      },
+      events: {},
+    });
+
+    const result = useGraphStore.getState().applyTransition(
+      threadId,
+      {
+        closedEpisodeId: "episode:r1",
+        transitionDate: "2023-09-01",
+        newEpisode: {
+          kind: "ex_partner",
+          certainty: "approximate",
+        },
+        event: {
+          type: "milestone",
+          title: "Broke up",
+        },
+      },
+      "r1",
+    );
+
+    expect(result.ok).toBe(true);
+
+    const state = useGraphStore.getState();
+    const transitioned = state.relationships.find((relationship) => relationship.id === "r1");
+    const untouched = state.relationships.find((relationship) => relationship.id === "r2");
+
+    expect(transitioned).toEqual(
+      expect.objectContaining({
+        type: "ex-partner",
+        isActive: true,
+        startYear: 2023,
+        startMonth: 9,
+        endYear: 2023,
+      }),
+    );
+
+    expect(untouched).toEqual(
+      expect.objectContaining({
+        id: "r2",
+        type: "child",
+        autoCreatedReciprocalOfId: "r-parent",
+      }),
+    );
+  });
+
   it("leaves symmetric relationship types unchanged", () => {
     useGraphStore.getState().addRelationship({
       source: "alice",
@@ -372,6 +479,160 @@ describe("useGraphStore http persistence", () => {
         source: "alice",
         target: "bob",
         type: "sibling",
+      }),
+    );
+  });
+
+  it("resyncs an open imported episode when legacy relationship dates drift", () => {
+    const threadId = "thread:alice:bob";
+    useGraphStore.setState({
+      relationships: [
+        {
+          id: "r1",
+          source: "alice",
+          target: "bob",
+          type: "partner",
+          category: "romantic",
+          direction: "two-way",
+          startYear: 2015,
+          startMonth: 6,
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+      threads: {
+        [threadId]: {
+          id: threadId,
+          personAId: "alice",
+          personBId: "bob",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+      episodes: {
+        "episode:r1": {
+          id: "episode:r1",
+          threadId,
+          kind: "romantic_partner",
+          startDate: "2026-01-01",
+          certainty: "unknown",
+          source: "imported",
+        },
+      },
+      events: {},
+    });
+
+    const relationship = useGraphStore.getState().relationships[0]!;
+    useGraphStore.getState().ensureLegacyRelationshipMigrated(relationship);
+
+    expect(useGraphStore.getState().episodes["episode:r1"]).toEqual(
+      expect.objectContaining({
+        id: "episode:r1",
+        threadId,
+        kind: "romantic_partner",
+        startDate: "2015-06-01",
+        certainty: "exact",
+        source: "imported",
+      }),
+    );
+  });
+
+  it("does not resync a closed imported episode", () => {
+    const threadId = "thread:alice:bob";
+    useGraphStore.setState({
+      relationships: [
+        {
+          id: "r1",
+          source: "alice",
+          target: "bob",
+          type: "partner",
+          category: "romantic",
+          direction: "two-way",
+          startYear: 2026,
+          startMonth: 1,
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+      threads: {
+        [threadId]: {
+          id: threadId,
+          personAId: "alice",
+          personBId: "bob",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+      episodes: {
+        "episode:r1": {
+          id: "episode:r1",
+          threadId,
+          kind: "romantic_partner",
+          startDate: "2015-06-01",
+          endDate: "2023-09-01",
+          certainty: "exact",
+          source: "imported",
+        },
+      },
+      events: {},
+    });
+
+    const relationship = useGraphStore.getState().relationships[0]!;
+    useGraphStore.getState().ensureLegacyRelationshipMigrated(relationship);
+
+    expect(useGraphStore.getState().episodes["episode:r1"]).toEqual(
+      expect.objectContaining({
+        startDate: "2015-06-01",
+        endDate: "2023-09-01",
+      }),
+    );
+  });
+
+  it("migrates reciprocal relationships to the canonical timeline episode", () => {
+    useGraphStore.setState({
+      relationships: [
+        {
+          id: "r1",
+          source: "alice",
+          target: "bob",
+          type: "parent",
+          category: "family",
+          direction: "one-way",
+          startYear: 2014,
+          startMonth: 2,
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+        {
+          id: "r2",
+          source: "bob",
+          target: "alice",
+          type: "child",
+          category: "family",
+          direction: "one-way",
+          autoCreatedReciprocalOfId: "r1",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+      threads: {},
+      episodes: {},
+      events: {},
+    });
+
+    const reciprocal = useGraphStore
+      .getState()
+      .relationships.find((relationship) => relationship.id === "r2");
+
+    expect(reciprocal).toBeDefined();
+    useGraphStore.getState().ensureLegacyRelationshipMigrated(reciprocal!);
+
+    const episodes = useGraphStore.getState().episodes;
+    expect(episodes["episode:r1"]).toBeDefined();
+    expect(episodes["episode:r2"]).toBeUndefined();
+    expect(episodes["episode:r1"]).toEqual(
+      expect.objectContaining({
+        startDate: "2014-02-01",
       }),
     );
   });

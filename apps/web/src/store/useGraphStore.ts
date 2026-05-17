@@ -18,6 +18,7 @@ import type {
   LayoutMode,
   Person,
   PersonInput,
+  EpisodeKind,
   Relationship,
   RelationshipCategory,
   RelationshipEpisode,
@@ -184,7 +185,11 @@ export interface GraphStore
    * Creates a milestone event at the transition date.
    * Returns { ok: false, error } on validation failure.
    */
-  applyTransition: (threadId: string, outcome: TransitionOutcome) => TransitionResult;
+  applyTransition: (
+    threadId: string,
+    outcome: TransitionOutcome,
+    relationshipId?: string,
+  ) => TransitionResult;
   /**
    * Ensure a legacy Relationship is represented in the HistorySlice.
    * Idempotent — safe to call multiple times for the same relationship.
@@ -210,6 +215,46 @@ function normalizeRelationshipType(type: string): string {
   return type.trim().toLowerCase();
 }
 
+function episodeKindToLegacyRelationshipType(kind: EpisodeKind): string {
+  switch (kind) {
+    case "close_friend":
+      return "close friend";
+    case "romantic_partner":
+      return "partner";
+    case "ex_partner":
+      return "ex-partner";
+    default:
+      return kind.replace(/_/g, " ");
+  }
+}
+
+function relationshipDebugSnapshot(relationship: Relationship | undefined | null) {
+  if (!relationship) return null;
+
+  return {
+    id: relationship.id,
+    source: relationship.source,
+    target: relationship.target,
+    type: relationship.type,
+    isActive: relationship.isActive,
+    startYear: relationship.startYear,
+    startMonth: relationship.startMonth,
+    endYear: relationship.endYear,
+    autoCreatedReciprocalOfId: relationship.autoCreatedReciprocalOfId,
+  };
+}
+
+function logRelationshipDebug(label: string, payload?: unknown) {
+  if (!import.meta.env.DEV) return;
+
+  if (payload === undefined) {
+    console.debug(`[relationships] ${label}`);
+    return;
+  }
+
+  console.debug(`[relationships] ${label}`, payload);
+}
+
 function buildRelationship(input: RelationshipInput): Relationship {
   const timestamp = nowIso();
   return {
@@ -218,6 +263,20 @@ function buildRelationship(input: RelationshipInput): Relationship {
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+}
+
+function canonicalRelationshipForTimeline(
+  relationship: Relationship,
+  relationships: Relationship[],
+): Relationship {
+  if (!relationship.autoCreatedReciprocalOfId) {
+    return relationship;
+  }
+
+  return (
+    relationships.find((candidate) => candidate.id === relationship.autoCreatedReciprocalOfId) ??
+    relationship
+  );
 }
 
 function hasRelationship(
@@ -413,6 +472,42 @@ function loadHistoryFromStorage(key: string): HistorySlice {
   }
 }
 
+function sanitizeHistoryAgainstRelationships(
+  history: HistorySlice,
+  relationships: Relationship[],
+): HistorySlice {
+  const reciprocalEpisodeIds = new Set(
+    relationships
+      .filter((relationship) => relationship.autoCreatedReciprocalOfId)
+      .map((relationship) => `episode:${relationship.id}`),
+  );
+
+  if (reciprocalEpisodeIds.size === 0) {
+    return history;
+  }
+
+  let changed = false;
+  const episodes = { ...history.episodes };
+
+  for (const episodeId of reciprocalEpisodeIds) {
+    const existing = episodes[episodeId];
+    if (!existing) continue;
+    if (existing.source !== "imported") continue;
+
+    delete episodes[episodeId];
+    changed = true;
+  }
+
+  if (!changed) {
+    return history;
+  }
+
+  return {
+    ...history,
+    episodes,
+  };
+}
+
 function saveHistoryToStorage(
   key: string,
   threads: Record<string, RelationshipThread>,
@@ -458,6 +553,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       drafts.load().catch(() => null),
     ]);
     const history = loadHistoryFromStorage(historyKey);
+    const sanitizedHistory = sanitizeHistoryAgainstRelationships(
+      history,
+      persisted.graph.relationships,
+    );
 
     set({
       people: persisted.graph.people,
@@ -466,7 +565,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       layoutMode: persisted.layout?.layoutMode ?? LAYOUT_DEFAULTS.layoutMode,
       treeShape: persisted.layout?.treeShape ?? LAYOUT_DEFAULTS.treeShape,
       treeRootId: persisted.layout?.treeRootId ?? LAYOUT_DEFAULTS.treeRootId,
-      ...history,
+      ...sanitizedHistory,
       _historyKey: historyKey,
       hydrated: true,
       _persistence: store,
@@ -477,6 +576,19 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
           : null,
       recoveryDraft: draft,
     });
+
+    if (sanitizedHistory !== history) {
+      saveHistoryToStorage(
+        historyKey,
+        sanitizedHistory.threads,
+        sanitizedHistory.episodes,
+        sanitizedHistory.events,
+      );
+    }
+
+    for (const relationship of persisted.graph.relationships) {
+      get().ensureLegacyRelationshipMigrated(relationship);
+    }
   },
 
   flushPersistence: async () => {
@@ -598,16 +710,35 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         relationships: [...nextRelationships, buildRelationship(reciprocalInput)],
       };
     });
+    get().ensureLegacyRelationshipMigrated(relationship);
     scheduleSave(get, set);
     return relationship;
   },
 
   updateRelationship: (id, patch) => {
+    const before = get().relationships.find((relationship) => relationship.id === id);
+    logRelationshipDebug("updateRelationship:start", {
+      id,
+      patch,
+      before: relationshipDebugSnapshot(before),
+    });
+
     set((s) => ({
       relationships: s.relationships.map((r) =>
         r.id === id ? { ...r, ...patch, updatedAt: nowIso() } : r,
       ),
     }));
+
+    const after = get().relationships.find((relationship) => relationship.id === id);
+    logRelationshipDebug("updateRelationship:done", {
+      id,
+      after: relationshipDebugSnapshot(after),
+    });
+
+    if (after) {
+      get().ensureLegacyRelationshipMigrated(after);
+    }
+
     scheduleSave(get, set);
   },
 
@@ -634,6 +765,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set({
       people: graph.people,
       relationships: graph.relationships,
+      ...HISTORY_DEFAULTS,
       // positions for unknown people are recomputed lazily by the graph view
       selectedPersonId: null,
       selectedRelationshipId: null,
@@ -641,6 +773,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       pathPersonIds: [],
       treeRootId: null,
     });
+
+    for (const relationship of graph.relationships) {
+      get().ensureLegacyRelationshipMigrated(relationship);
+    }
+
     scheduleSave(get, set);
   },
 
@@ -725,8 +862,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   // -- history actions --
-  applyTransition: (threadId, outcome) => {
+  applyTransition: (threadId, outcome, relationshipId) => {
     const { episodes, events, threads, _historyKey } = get();
+    logRelationshipDebug("applyTransition:start", {
+      threadId,
+      relationshipId,
+      outcome,
+    });
 
     // 1. Find episode
     const episode = episodes[outcome.closedEpisodeId];
@@ -746,10 +888,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }
 
     // 4. Validate transition date >= episode start date
-    if (outcome.transitionDate < episode.startDate) {
+    const finalStartDate = outcome.correctedStartDate || episode.startDate;
+    if (outcome.transitionDate < finalStartDate) {
       return {
         ok: false,
-        error: `Transition date cannot be before the episode started (${episode.startDate.slice(0, 4)}).`,
+        error: `Transition date cannot be before the episode started (${finalStartDate.slice(0, 4)}).`,
       };
     }
 
@@ -806,7 +949,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     // 7. Apply mutations
     const updatedEpisodes: Record<string, RelationshipEpisode> = {
       ...episodes,
-      [outcome.closedEpisodeId]: { ...episode, endDate: outcome.transitionDate },
+      [outcome.closedEpisodeId]: {
+        ...episode,
+        endDate: outcome.transitionDate,
+        ...(outcome.correctedStartDate ? { startDate: outcome.correctedStartDate } : {}),
+      },
       ...(newEpisodeRecord ? { [newEpisodeRecord.id]: newEpisodeRecord } : {}),
     };
     const updatedEvents: Record<string, RelationshipEvent> = {
@@ -821,12 +968,69 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       saveHistoryToStorage(_historyKey, threads, updatedEpisodes, updatedEvents);
     }
 
+    const resolvedRelationshipId =
+      relationshipId ??
+      (outcome.closedEpisodeId.startsWith("episode:")
+        ? outcome.closedEpisodeId.slice("episode:".length)
+        : undefined);
+
+    const relationship = resolvedRelationshipId
+      ? get().relationships.find((candidate) => candidate.id === resolvedRelationshipId)
+      : undefined;
+
+    logRelationshipDebug("applyTransition:resolvedRelationship", {
+      relationshipId: resolvedRelationshipId,
+      relationship: relationshipDebugSnapshot(relationship),
+    });
+
+    if (relationship) {
+      const transitionDateParts = outcome.transitionDate.split("-");
+      const transitionYear = Number.parseInt(transitionDateParts[0] ?? "", 10);
+      const transitionMonth = Number.parseInt(transitionDateParts[1] ?? "", 10);
+      const hasValidTransitionYear = Number.isFinite(transitionYear);
+      const hasValidTransitionMonth = Number.isFinite(transitionMonth);
+
+      const patch: Partial<RelationshipInput> = {
+        isActive: Boolean(newEpisodeRecord),
+        ...(hasValidTransitionYear ? { endYear: transitionYear } : {}),
+        ...(newEpisodeRecord
+          ? { type: episodeKindToLegacyRelationshipType(newEpisodeRecord.kind) }
+          : {}),
+      };
+
+      if (newEpisodeRecord && hasValidTransitionYear && hasValidTransitionMonth) {
+        const currentStartMonth = relationship.startMonth ?? 1;
+        if (
+          relationship.startYear !== transitionYear ||
+          currentStartMonth !== transitionMonth
+        ) {
+          patch.startYear = transitionYear;
+          patch.startMonth = transitionMonth;
+        }
+      }
+
+      logRelationshipDebug("applyTransition:legacyPatch", {
+        relationshipId: relationship.id,
+        patch,
+        before: relationshipDebugSnapshot(relationship),
+      });
+
+      get().updateRelationship(relationship.id, patch);
+    }
+
     return { ok: true, ...(warning ? { warning } : {}) };
   },
 
   ensureLegacyRelationshipMigrated: (relationship) => {
-    const threadId = makeThreadId(relationship.source, relationship.target);
-    const episodeId = `episode:${relationship.id}`;
+    const canonicalRelationship = canonicalRelationshipForTimeline(
+      relationship,
+      get().relationships,
+    );
+    const threadId = makeThreadId(
+      canonicalRelationship.source,
+      canonicalRelationship.target,
+    );
+    const episodeId = `episode:${canonicalRelationship.id}`;
     const { threads, episodes, events, _historyKey } = get();
 
     let needsSave = false;
@@ -835,24 +1039,60 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
 
     if (!updatedThreads[threadId]) {
       const [personAId, personBId] = normalizeThreadParticipants(
-        relationship.source,
-        relationship.target,
+        canonicalRelationship.source,
+        canonicalRelationship.target,
       );
       updatedThreads[threadId] = {
         id: threadId,
         personAId,
         personBId,
-        ...(relationship.color ? { colorOverride: relationship.color } : {}),
-        createdAt: relationship.createdAt,
-        updatedAt: relationship.updatedAt,
+        ...(canonicalRelationship.color
+          ? { colorOverride: canonicalRelationship.color }
+          : {}),
+        createdAt: canonicalRelationship.createdAt,
+        updatedAt: canonicalRelationship.updatedAt,
       };
       needsSave = true;
     }
 
     if (!updatedEpisodes[episodeId]) {
-      const episode = migrateLegacyRelationshipToEpisode(relationship, threadId);
+      const episode = migrateLegacyRelationshipToEpisode(
+        canonicalRelationship,
+        threadId,
+      );
       updatedEpisodes[episodeId] = episode;
       needsSave = true;
+    } else {
+      const existingEpisode = updatedEpisodes[episodeId];
+      const hasOtherOpenEpisode = Object.values(updatedEpisodes).some(
+        (episode) =>
+          episode.threadId === threadId &&
+          episode.id !== episodeId &&
+          !episode.endDate,
+      );
+      const canResyncLegacyEpisode =
+        existingEpisode.source === "imported" &&
+        !existingEpisode.endDate &&
+        !hasOtherOpenEpisode;
+
+      if (canResyncLegacyEpisode) {
+        const migratedEpisode = migrateLegacyRelationshipToEpisode(
+          canonicalRelationship,
+          threadId,
+        );
+        const hasLegacyDrift =
+          existingEpisode.kind !== migratedEpisode.kind ||
+          existingEpisode.label !== migratedEpisode.label ||
+          existingEpisode.startDate !== migratedEpisode.startDate ||
+          existingEpisode.endDate !== migratedEpisode.endDate ||
+          existingEpisode.certainty !== migratedEpisode.certainty ||
+          existingEpisode.notes !== migratedEpisode.notes;
+
+        if (hasLegacyDrift) {
+          updatedEpisodes[episodeId] = migratedEpisode;
+          needsSave = true;
+        }
+      }
     }
 
     if (needsSave) {

@@ -9,11 +9,12 @@ import type { PersonNode as PersonNodeType } from "./useGraphView";
 import { DEFAULT_PERSON_COLOR } from "../constants";
 import { capitalizeWords } from "../lib/string";
 
-export function PersonNode({ data }: NodeProps<PersonNodeType>) {
+export function PersonNode({ data, selected: rfSelected }: NodeProps<PersonNodeType>) {
   const { person, dimmed, highlighted, onPath, searchMatch, selected } = data;
+  const isSelected = selected || rfSelected;
   const accent = person.color ?? DEFAULT_PERSON_COLOR;
   const handleClass = "!opacity-0 !w-3 !h-3 !min-w-0 !min-h-0";
-  const outlineColor = selected
+  const outlineColor = isSelected
     ? "var(--rf-graph-node-root-border)"
     : highlighted
       ? "var(--rf-border-strong)"
@@ -22,7 +23,7 @@ export function PersonNode({ data }: NodeProps<PersonNodeType>) {
         : searchMatch
           ? categoryTokens.work.gfx
           : "transparent";
-  const filter = selected
+  const filter = isSelected
     ? getCategoryGlowFilter("other")
     : onPath
       ? getCategoryGlowFilter("romantic", "focused")

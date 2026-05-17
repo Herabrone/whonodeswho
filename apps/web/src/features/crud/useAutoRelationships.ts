@@ -81,10 +81,12 @@ function toProposedRelationship(proposal: RelationshipProposal): ProposedRelatio
 export function inferAutoRelationships(
   primary: RelationshipInput,
   relationships: Relationship[],
+  people?: Person[],
 ): AutoRelationshipInference {
   const result = runRelationshipInference({
     existingRelationships: relationships,
     primary,
+    people,
   });
 
   return {
@@ -99,12 +101,13 @@ export function useAutoRelationships(
   sourceId: string,
   targetId: string,
   category: RelationshipCategory,
-  _people: Person[],
+  people: Person[],
   relationships: Relationship[],
 ): ProposedRelationship[] {
   return inferAutoRelationships(
     primaryDraft(relationshipType, sourceId, targetId, category),
     relationships,
+    people,
   ).proposals;
 }
 

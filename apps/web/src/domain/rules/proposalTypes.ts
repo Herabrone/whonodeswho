@@ -36,4 +36,5 @@ export interface InferenceRequest {
   existingRelationships: Array<RelationshipInput & { id?: string }>;
   primary: RelationshipInput;
   maxIterations?: number;
+  people?: Array<{ id: string; name: string }>;
 }

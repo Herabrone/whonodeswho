@@ -14,6 +14,8 @@ const action: PendingAction = {
     relationshipType: 'friend',
     category: 'friend',
     direction: 'two-way',
+    startYear: 2015,
+    startMonth: 6,
   },
 };
 

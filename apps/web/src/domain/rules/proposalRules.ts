@@ -54,9 +54,14 @@ function outputTypeForFact(fact: Fact): string {
   }
 }
 
-function explanationForFact(fact: Fact): string {
+function explanationForFact(fact: Fact, peopleMap?: Map<string, string>): string {
   const title = RULE_TITLES[fact.ruleId ?? ""] ?? fact.ruleId ?? "Relationship rule";
-  const evidence = fact.evidence?.map((item) => item.args.join(" -> ")).join("; ");
+
+  const getName = (id: string) => peopleMap?.get(id) ?? id;
+
+  const evidence = fact.evidence
+    ?.map((item) => `${getName(item.args[0])} -> ${getName(item.args[1])}`)
+    .join("; ");
   return evidence ? `${title}: ${evidence}` : title;
 }
 
@@ -80,7 +85,9 @@ function draftForFact(fact: Fact): RelationshipInput {
 export function proposalsFromFacts(
   facts: Fact[],
   baseFacts: Fact[],
+  people?: Array<{ id: string; name: string }>,
 ): { proposals: RelationshipProposal[]; issues: ValidationIssue[] } {
+  const peopleMap = people ? new Map(people.map((p) => [p.id, p.name])) : undefined;
   const baseKeys = new Set(baseFacts.map(factKey));
   const proposedKeys = new Set<string>();
   const proposals: RelationshipProposal[] = [];
@@ -104,7 +111,7 @@ export function proposalsFromFacts(
         : undefined;
     proposals.push({
       ruleId: fact.ruleId ?? "derived-relationship",
-      explanation: explanationForFact(fact),
+      explanation: explanationForFact(fact, peopleMap),
       evidence: fact.evidence ?? [],
       confidence,
       prechecked: shouldPrecheck(confidence),

@@ -220,6 +220,10 @@ export interface PendingCreateRelationshipPayload {
   relationshipType: string;
   category: RelationshipCategory;
   direction: RelationshipDirection;
+  startYear?: number;
+  startMonth?: number;
+  endYear?: number;
+  isActive?: boolean;
   notes?: string;
 }
 

@@ -244,6 +244,10 @@ export class ChatService {
             this.stringArg(args, 'toPersonId'),
             this.stringArg(args, 'relationshipType'),
             this.optionalStringArg(args, 'notes'),
+            this.optionalNumberArg(args, 'startYear'),
+            this.optionalNumberArg(args, 'startMonth'),
+            this.optionalNumberArg(args, 'endYear'),
+            this.optionalBooleanArg(args, 'isActive'),
           );
           return {
             data,
@@ -284,6 +288,24 @@ export class ChatService {
     return typeof value === 'string' && value.trim().length > 0
       ? value
       : undefined;
+  }
+
+  private optionalNumberArg(
+    args: Record<string, unknown>,
+    key: string,
+  ): number | undefined {
+    const value = args[key];
+    return typeof value === 'number' && Number.isFinite(value)
+      ? Math.trunc(value)
+      : undefined;
+  }
+
+  private optionalBooleanArg(
+    args: Record<string, unknown>,
+    key: string,
+  ): boolean | undefined {
+    const value = args[key];
+    return typeof value === 'boolean' ? value : undefined;
   }
 
   private numberArg(

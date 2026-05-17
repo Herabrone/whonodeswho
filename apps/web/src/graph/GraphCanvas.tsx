@@ -11,6 +11,7 @@ import {
   Background,
   Controls,
   Panel,
+  SelectionMode,
   useReactFlow,
   useViewport,
   useStore,
@@ -20,6 +21,7 @@ import {
   type NodeMouseHandler,
   type EdgeMouseHandler,
 } from "@xyflow/react";
+import { Hand, MousePointer } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 import { PersonNode } from "./PersonNode";
 import { useGraphView } from "./useGraphView";
@@ -378,7 +380,8 @@ function MinimapContainer({ nodes, edges }: { nodes: any[]; edges: any[] }) {
 
 export function GraphCanvas() {
   const { nodes, edges, radialLabels, groupedDivider } = useGraphView();
-  const { fitView } = useReactFlow();
+  const { fitView, getNodes } = useReactFlow();
+  const [cursorMode, setCursorMode] = useState<"pan" | "select">("pan");
   const setPosition = useGraphStore((s) => s.setPosition);
   const selectPerson = useGraphStore((s) => s.selectPerson);
   const selectRelationship = useGraphStore((s) => s.selectRelationship);
@@ -497,6 +500,24 @@ export function GraphCanvas() {
     });
   }, []);
 
+  const onNodeDragStop = useCallback<NodeMouseHandler>(
+    (_, draggedNode) => {
+      const selectedNodes = getNodes().filter(
+        (node) => node.selected && node.type === "person",
+      );
+      const nodesToPersist = selectedNodes.some((node) => node.id === draggedNode.id)
+        ? selectedNodes
+        : [draggedNode];
+
+      for (const node of nodesToPersist) {
+        if (node.position) {
+          setPosition(node.id, node.position);
+        }
+      }
+    },
+    [getNodes, setPosition],
+  );
+
   useEffect(() => {
     if (layoutMode !== "tree") return;
     const frame = requestAnimationFrame(() => {
@@ -511,7 +532,12 @@ export function GraphCanvas() {
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      panOnDrag={cursorMode === "pan"}
+      selectionOnDrag={cursorMode === "select"}
+      multiSelectionKeyCode={cursorMode === "select" ? null : undefined}
+      selectionMode={cursorMode === "select" ? SelectionMode.Partial : undefined}
       onNodesChange={onNodesChange}
+      onNodeDragStop={onNodeDragStop}
       onNodeClick={onNodeClick}
       onNodeDoubleClick={onNodeDoubleClick}
       onNodeContextMenu={onNodeContextMenu}
@@ -521,7 +547,7 @@ export function GraphCanvas() {
         clearSelection();
         setMenu(null);
       }}
-      nodesDraggable={layoutMode === "free"}
+      nodesDraggable
       zoomOnDoubleClick={layoutMode !== "tree"}
       fitView
       fitViewOptions={{ padding: 0.3 }}
@@ -541,6 +567,82 @@ export function GraphCanvas() {
           backdropFilter: "blur(14px)",
         }}
       />
+      <Panel
+        position="top-left"
+        style={{
+          marginTop: 72,
+          marginLeft: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          boxShadow: "none",
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Pan mode"
+          title="Pan mode"
+          onClick={() => setCursorMode("pan")}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border:
+              cursorMode === "pan"
+                ? "1px solid var(--rf-accent)"
+                : "1px solid var(--rf-graph-control-border)",
+            background:
+              cursorMode === "pan"
+                ? "color-mix(in srgb, var(--rf-accent) 14%, var(--rf-graph-control-bg))"
+                : "var(--rf-graph-control-bg)",
+            color:
+              cursorMode === "pan"
+                ? "var(--rf-accent)"
+                : "var(--rf-graph-control-text)",
+            backdropFilter: "blur(14px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          <Hand size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label="Selection mode"
+          title="Selection mode"
+          onClick={() => setCursorMode("select")}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border:
+              cursorMode === "select"
+                ? "1px solid var(--rf-accent)"
+                : "1px solid var(--rf-graph-control-border)",
+            background:
+              cursorMode === "select"
+                ? "color-mix(in srgb, var(--rf-accent) 14%, var(--rf-graph-control-bg))"
+                : "var(--rf-graph-control-bg)",
+            color:
+              cursorMode === "select"
+                ? "var(--rf-accent)"
+                : "var(--rf-graph-control-text)",
+            backdropFilter: "blur(14px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          <MousePointer size={16} />
+        </button>
+      </Panel>
       <MinimapContainer nodes={nodes} edges={edges} />
       {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
       <ViewportPortal>

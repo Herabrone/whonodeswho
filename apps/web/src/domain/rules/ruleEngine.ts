@@ -23,7 +23,18 @@ export function runRelationshipInference({
   existingRelationships,
   primary,
   maxIterations = 2,
+  people,
 }: InferenceRequest): InferenceResult {
+  // 1. Identify neighbors of A and B in existing relationships
+  const neighbors = new Set<string>();
+  for (const rel of existingRelationships) {
+    neighbors.add(rel.source);
+    neighbors.add(rel.target);
+  }
+
+  // 2. Define the eligible pool: all people seen in existing relationships + A and B
+  const pool = new Set([...neighbors, primary.source, primary.target]);
+
   const factBase = buildFactBase(existingRelationships, primary);
   const validationIssues = validateFactBase(factBase);
   const hasFatalIssue = validationIssues.some((issue) => issue.severity === "fatal");
@@ -35,13 +46,21 @@ export function runRelationshipInference({
   let frontier = factBase.facts;
   for (let depth = 1; depth <= maxIterations; depth++) {
     const derived = applyPositiveRules(known, frontier, depth);
-    const fresh = freshFacts(known, derived);
+
+    // 3. Filter derived facts: only keep facts where BOTH people are in the pool
+    // This allows the engine to USE all existing knowledge, but only PROPOSE 
+    // or CHAIN new facts that directly involve the eligible participants.
+    const filteredDerived = derived.filter(
+      (fact) => pool.has(fact.args[0]) && pool.has(fact.args[1]),
+    );
+
+    const fresh = freshFacts(known, filteredDerived);
     if (fresh.length === 0) break;
     known = sortFacts([...known, ...fresh]);
     frontier = fresh;
   }
 
-  const { proposals, issues } = proposalsFromFacts(known, factBase.facts);
+  const { proposals, issues } = proposalsFromFacts(known, factBase.facts, people);
   return {
     facts: known,
     proposals,

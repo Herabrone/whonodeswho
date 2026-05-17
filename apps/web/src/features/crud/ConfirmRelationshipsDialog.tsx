@@ -13,6 +13,11 @@ export interface ProposalItem {
   category: RelationshipCategory;
   type: string;
   direction: RelationshipDirection;
+  startYear?: number;
+  startMonth?: number;
+  endYear?: number;
+  isActive?: boolean;
+  color?: string;
   notes?: string;
   rule?: string;
   reason?: string;

@@ -1,28 +1,38 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { EpisodeKind, RelationshipEpisode } from "../../types";
 import type { TransitionOption, TransitionOutcome } from "../../domain/timeline/transitionTypes";
 import { getAvailableTransitions, ALL_EPISODE_KINDS } from "../../domain/timeline/transitionEngine";
 import { EPISODE_KIND_LABELS } from "../../domain/timeline/timelineTypes";
 import { useGraphStore } from "../../store/useGraphStore";
 import { TransitionOptionCard, KindButton } from "./TransitionOptionCard";
-import { TransitionDatePicker } from "./TransitionDatePicker";
+import { TransitionDatePicker, type DatePrecision } from "./TransitionDatePicker";
 import { TransitionPreview } from "./TransitionPreview";
 
 type Step = "option" | "friend_level" | "date" | "notes";
 
 interface RelationshipTransitionDialogProps {
   threadId: string;
+  relationshipId: string;
   onClose: () => void;
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-function isoYear(year: number): string {
-  return `${year}-01-01`;
+function isoDateString(year: number, month: number, day: number): string {
+  const m = month.toString().padStart(2, "0");
+  const d = day.toString().padStart(2, "0");
+  return `${year}-${m}-${d}`;
 }
 
-export function RelationshipTransitionDialog({ threadId, onClose }: RelationshipTransitionDialogProps) {
+export function RelationshipTransitionDialog({
+  threadId,
+  relationshipId,
+  onClose,
+}: RelationshipTransitionDialogProps) {
   const thread = useGraphStore((s) => s.threads[threadId]);
+  const relationship = useGraphStore((s) =>
+    s.relationships.find((item) => item.id === relationshipId) ?? null,
+  );
   const allEpisodes = useGraphStore((s) => s.episodes);
   const people = useGraphStore((s) => s.people);
   const timelineYear = useGraphStore((s) => s.timelineYear);
@@ -55,8 +65,11 @@ export function RelationshipTransitionDialog({ threadId, onClose }: Relationship
   );
 
   const defaultYear = Math.floor(timelineYear) < CURRENT_YEAR ? Math.floor(timelineYear) : CURRENT_YEAR;
+  const maxYear = CURRENT_YEAR + 5;
+  const relationshipStartYear = relationship?.startYear;
+  const relationshipStartMonth = relationship?.startMonth ?? 1;
   const minYear = activeEpisode
-    ? parseInt(activeEpisode.startDate.slice(0, 4), 10)
+    ? relationshipStartYear ?? parseInt(activeEpisode.startDate.slice(0, 4), 10)
     : CURRENT_YEAR - 50;
 
   // Dialog state
@@ -64,16 +77,58 @@ export function RelationshipTransitionDialog({ threadId, onClose }: Relationship
   const [selectedOption, setSelectedOption] = useState<TransitionOption | null>(null);
   const [friendLevel, setFriendLevel] = useState<"friend" | "close_friend">("friend");
   const [transitionYear, setTransitionYear] = useState(defaultYear);
+  const [transitionMonth, setTransitionMonth] = useState(1);
+  const [transitionDay, setTransitionDay] = useState(1);
+  const [precision, setPrecision] = useState<DatePrecision>("year");
+
+  // Correction state
+  const [correctedYear, setCorrectedYear] = useState(minYear);
+  const [correctedMonth, setCorrectedMonth] = useState(1);
+  const [correctedDay, setCorrectedDay] = useState(1);
+  const [correctedPrecision, setCorrectedPrecision] = useState<DatePrecision>("year");
+  const [isCorrecting, setIsCorrecting] = useState(false);
+
   const [notes, setNotes] = useState("");
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [customStartsKind, setCustomStartsKind] = useState<EpisodeKind | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (relationshipStartYear !== undefined) {
+      setTransitionYear(relationshipStartYear);
+      setTransitionMonth(relationshipStartMonth);
+      setTransitionDay(1);
+      return;
+    }
+
+    setTransitionYear(defaultYear);
+    setTransitionMonth(1);
+    setTransitionDay(1);
+  }, [defaultYear, relationshipId, relationshipStartMonth, relationshipStartYear]);
+
+  useEffect(() => {
+    if (relationshipStartYear !== undefined) {
+      setCorrectedYear(relationshipStartYear);
+      setCorrectedMonth(relationshipStartMonth);
+      setCorrectedDay(1);
+      return;
+    }
+
+    if (activeEpisode) {
+      const year = parseInt(activeEpisode.startDate.slice(0, 4), 10);
+      const month = parseInt(activeEpisode.startDate.slice(5, 7), 10);
+      const day = parseInt(activeEpisode.startDate.slice(8, 10), 10);
+      setCorrectedYear(year);
+      setCorrectedMonth(month);
+      setCorrectedDay(day);
+    }
+  }, [activeEpisode, relationshipStartMonth, relationshipStartYear]);
+
   if (!thread || !activeEpisode) {
     return (
       <ModalOverlay onClose={onClose}>
-        <DialogShell onClose={onClose} title="Change relationship">
+        <DialogShell onClose={onClose} title="Update relationship">
           <p style={{ padding: "16px", fontSize: 13, color: "var(--rf-text-secondary, var(--rf-muted))" }}>
             No active relationship episode found for this connection. Use the episode editor to add one.
           </p>
@@ -124,7 +179,10 @@ export function RelationshipTransitionDialog({ threadId, onClose }: Relationship
 
     const outcome: TransitionOutcome = {
       closedEpisodeId: activeEpisode.id,
-      transitionDate: isoYear(transitionYear),
+      transitionDate: isoDateString(transitionYear, transitionMonth, transitionDay),
+      ...(isCorrecting
+        ? { correctedStartDate: isoDateString(correctedYear, correctedMonth, correctedDay) }
+        : {}),
       ...(resolvedStartsKind
         ? {
             newEpisode: {
@@ -140,7 +198,7 @@ export function RelationshipTransitionDialog({ threadId, onClose }: Relationship
       },
     };
 
-    const result = applyTransition(threadId, outcome);
+    const result = applyTransition(threadId, outcome, relationshipId);
 
     if (!result.ok) {
       setError(result.error);
@@ -159,7 +217,7 @@ export function RelationshipTransitionDialog({ threadId, onClose }: Relationship
     <ModalOverlay onClose={onClose}>
       <DialogShell
         onClose={onClose}
-        title="Change relationship"
+        title="Update relationship"
         stepIndicator={
           <StepDots
             steps={["option", "date", "notes"] as Step[]}
@@ -204,8 +262,17 @@ export function RelationshipTransitionDialog({ threadId, onClose }: Relationship
         {step === "date" && (
           <StepDate
             transitionYear={transitionYear}
+            transitionMonth={transitionMonth}
+            transitionDay={transitionDay}
+            precision={precision}
             minYear={minYear}
-            onChange={setTransitionYear}
+            maxYear={maxYear}
+            onDateChange={(y, m, d) => {
+              setTransitionYear(y);
+              setTransitionMonth(m);
+              setTransitionDay(d);
+            }}
+            onPrecisionChange={setPrecision}
             onBack={() => setStep(selectedOption?.followUp === "friend_level" ? "friend_level" : "option")}
             onNext={handleAdvanceFromDate}
           />
@@ -218,9 +285,24 @@ export function RelationshipTransitionDialog({ threadId, onClose }: Relationship
             option={selectedOption}
             resolvedStartsKind={resolvedStartsKind}
             transitionYear={transitionYear}
+            transitionMonth={transitionMonth}
+            transitionDay={transitionDay}
             otherPersonName={otherPersonName}
             error={error}
             warning={warning}
+            correctedYear={correctedYear}
+            correctedMonth={correctedMonth}
+            correctedDay={correctedDay}
+            correctedPrecision={correctedPrecision}
+            isCorrecting={isCorrecting}
+            onCorrectionChange={(y, m, d) => {
+              setCorrectedYear(y);
+              setCorrectedMonth(m);
+              setCorrectedDay(d);
+              setIsCorrecting(true);
+              setError(null);
+            }}
+            onPrecisionChange={setCorrectedPrecision}
             onBack={() => setStep("date")}
             onConfirm={handleConfirm}
           />
@@ -592,14 +674,24 @@ function StepFriendLevel({
 
 function StepDate({
   transitionYear,
+  transitionMonth,
+  transitionDay,
+  precision,
   minYear,
-  onChange,
+  maxYear,
+  onDateChange,
+  onPrecisionChange,
   onBack,
   onNext,
 }: {
   transitionYear: number;
+  transitionMonth: number;
+  transitionDay: number;
+  precision: DatePrecision;
   minYear: number;
-  onChange: (year: number) => void;
+  maxYear: number;
+  onDateChange: (y: number, m: number, d: number) => void;
+  onPrecisionChange: (p: DatePrecision) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -609,10 +701,14 @@ function StepDate({
         When did this happen?
       </p>
       <TransitionDatePicker
-        value={transitionYear}
+        year={transitionYear}
+        month={transitionMonth}
+        day={transitionDay}
+        precision={precision}
         min={minYear}
-        max={CURRENT_YEAR + 1}
-        onChange={onChange}
+        max={maxYear}
+        onDateChange={onDateChange}
+        onPrecisionChange={onPrecisionChange}
       />
       <ActionRow>
         <BtnSecondary onClick={onBack}>← Back</BtnSecondary>
@@ -632,9 +728,18 @@ function StepNotes({
   option,
   resolvedStartsKind,
   transitionYear,
+  transitionMonth,
+  transitionDay,
   otherPersonName,
   error,
   warning,
+  correctedYear,
+  correctedMonth,
+  correctedDay,
+  correctedPrecision,
+  isCorrecting,
+  onCorrectionChange,
+  onPrecisionChange,
   onBack,
   onConfirm,
 }: {
@@ -643,12 +748,27 @@ function StepNotes({
   option: TransitionOption;
   resolvedStartsKind: EpisodeKind | undefined;
   transitionYear: number;
+  transitionMonth: number;
+  transitionDay: number;
   otherPersonName: string;
   error: string | null;
   warning: string | null;
+  correctedYear: number;
+  correctedMonth: number;
+  correctedDay: number;
+  correctedPrecision: DatePrecision;
+  isCorrecting: boolean;
+  onCorrectionChange: (y: number, m: number, d: number) => void;
+  onPrecisionChange: (p: DatePrecision) => void;
   onBack: () => void;
   onConfirm: () => void;
 }) {
+  const transIso = isoDateString(transitionYear, transitionMonth, transitionDay);
+  const corrIso = isoDateString(correctedYear, correctedMonth, correctedDay);
+  const showCorrection = error?.includes("Transition date cannot be before") || isCorrecting;
+
+  const isInvalid = isCorrecting && transIso < corrIso;
+
   return (
     <div>
       <p style={{ fontSize: 13, color: "var(--rf-text-secondary, var(--rf-muted))", marginBottom: 14, marginTop: 0 }}>
@@ -686,6 +806,37 @@ function StepNotes({
 
       {warning && <InlineWarning message={warning} />}
       {error && <InlineError message={error} />}
+
+      {showCorrection && (
+        <div
+          style={{
+            marginTop: 16,
+            padding: "16px",
+            background: "var(--rf-bg-subtle, #f9fafb)",
+            borderRadius: 12,
+            border: `1px solid ${isInvalid ? "var(--rf-cat-romantic-ui, #e64980)" : "var(--rf-border-default, #d1d5db)"}`,
+          }}
+        >
+          <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 600, color: "var(--rf-text-primary)" }}>
+            Correct the start date instead
+          </p>
+          <TransitionDatePicker
+            year={correctedYear}
+            month={correctedMonth}
+            day={correctedDay}
+            precision={correctedPrecision}
+            min={1900}
+            max={transitionYear + 5}
+            onDateChange={onCorrectionChange}
+            onPrecisionChange={onPrecisionChange}
+          />
+          {isInvalid && (
+            <p style={{ fontSize: 12, color: "var(--rf-cat-romantic-ui, #c23060)", marginTop: 8, marginBottom: 0 }}>
+              Corrected start date must be before or on the transition date ({transIso}).
+            </p>
+          )}
+        </div>
+      )}
 
       <ActionRow>
         <BtnSecondary onClick={onBack}>← Back</BtnSecondary>

@@ -89,6 +89,10 @@ describe('GraphToolsService', () => {
         'carol',
         'coworker',
         'Project team',
+        2015,
+        6,
+        2026,
+        false,
       ),
     ).resolves.toMatchObject({
       type: 'create_relationship',
@@ -97,9 +101,92 @@ describe('GraphToolsService', () => {
         toPersonName: 'Carol Tran',
         relationshipType: 'coworker',
         category: 'work',
+        startYear: 2015,
+        startMonth: 6,
+        endYear: 2026,
+        isActive: false,
         notes: 'Project team',
       },
     });
+  });
+
+  it('persists optional temporal fields when executing relationship creation', async () => {
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    const prisma = {
+      relationship: {
+        create: jest.fn().mockResolvedValue({
+          id: 'r-new',
+          sourceId: 'alice',
+          targetId: 'carol',
+          type: 'coworker',
+          category: 'work',
+          direction: 'two-way',
+          startYear: 2015,
+          startMonth: 6,
+          endYear: 2026,
+          isActive: false,
+          color: null,
+          notes: 'Project team',
+          createdAt,
+          updatedAt: createdAt,
+        }),
+      },
+      user: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+      auditLog: {
+        create: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const graphService = {
+      getGraph: jest.fn().mockResolvedValue({ graph }),
+    };
+    const service = new GraphToolsService(
+      prisma as never,
+      graphService as never,
+    );
+    jest.spyOn(service, 'validateAction').mockResolvedValue(undefined);
+
+    const action = {
+      type: 'create_relationship' as const,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      payload: {
+        fromPersonId: 'alice',
+        fromPersonName: 'Alice Tran',
+        toPersonId: 'carol',
+        toPersonName: 'Carol Tran',
+        relationshipType: 'coworker',
+        category: 'work' as const,
+        direction: 'two-way' as const,
+        startYear: 2015,
+        startMonth: 6,
+        endYear: 2026,
+        isActive: false,
+        notes: 'Project team',
+      },
+    };
+
+    await expect(service.executeAction('user-1', action)).resolves.toMatchObject({
+      success: true,
+      relationship: {
+        id: 'r-new',
+        startYear: 2015,
+        startMonth: 6,
+        endYear: 2026,
+        isActive: false,
+      },
+    });
+
+    expect(prisma.relationship.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          startYear: 2015,
+          startMonth: 6,
+          endYear: 2026,
+          isActive: false,
+        }),
+      }),
+    );
   });
 
   it('resolves people by alias and returns direct relationship context', async () => {
