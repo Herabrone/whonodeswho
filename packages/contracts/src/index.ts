@@ -29,6 +29,10 @@ export interface Relationship {
   type: string;
   category: RelationshipCategory;
   direction: RelationshipDirection;
+  startYear?: number;
+  startMonth?: number;
+  endYear?: number;
+  isActive?: boolean;
   color?: string;
   notes?: string;
   createdAt: string;
