@@ -1,5 +1,5 @@
 /**
- * RelationFlow — SHARED CONSTANTS
+ * whoNodeswho — SHARED CONSTANTS
  * Single source of truth for category colors and the relationship catalog.
  * Mirror of the color values in tailwind.config.js — keep them in sync.
  */

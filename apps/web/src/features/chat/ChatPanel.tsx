@@ -55,7 +55,7 @@ export function ChatPanel({
     <section className="pointer-events-auto absolute bottom-4 right-4 z-[45] flex h-[480px] w-[400px] max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-line bg-panel shadow-panel max-sm:bottom-0 max-sm:right-0 max-sm:h-full max-sm:w-full max-sm:max-w-none max-sm:rounded-none">
       <header className="flex items-center justify-between border-b border-line px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-ink">RelationFlow chat</h2>
+          <h2 className="text-sm font-semibold text-ink">Nodell chat</h2>
           <p className="text-xs text-muted">
             {activeToolName ? `Checking ${activeToolName.replace(/_/g, " ")}` : "Ready"}
           </p>

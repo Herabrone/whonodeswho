@@ -23,8 +23,8 @@ export class OpenRouterService {
       baseURL,
       apiKey,
       defaultHeaders: {
-        'HTTP-Referer': 'https://github.com/relationflow/whonodeswho',
-        'X-Title': 'who nodes who',
+        'HTTP-Referer': 'https://github.com/whonodeswho/whonodeswho',
+        'X-Title': 'whoNodeswho',
       },
     });
   }

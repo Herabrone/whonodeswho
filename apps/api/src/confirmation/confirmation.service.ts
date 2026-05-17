@@ -32,7 +32,7 @@ export class ConfirmationService {
   private get secret(): string {
     return (
       this.config.get<string>('CONFIRMATION_TOKEN_SECRET') ??
-      'relationflow-local-confirmation-secret'
+      'whonodeswho-local-confirmation-secret'
     );
   }
 

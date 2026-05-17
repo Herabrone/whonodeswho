@@ -15,6 +15,24 @@ import { TimelineFeature } from "./features/timeline";
 import { ChatFeature } from "./features/chat";
 import { AuthProvider } from "./auth/AuthContext";
 import { AuthGuard } from "./auth/AuthGuard";
+import {
+  buildCssVars,
+  DESIGN_TOKENS_STYLE_ID,
+  themeStorage,
+} from "@/design-tokens";
+
+if (typeof document !== "undefined") {
+  let style = document.getElementById(DESIGN_TOKENS_STYLE_ID) as HTMLStyleElement | null;
+
+  if (!style) {
+    style = document.createElement("style");
+    style.id = DESIGN_TOKENS_STYLE_ID;
+    document.head.appendChild(style);
+  }
+
+  style.textContent = buildCssVars();
+  themeStorage.apply();
+}
 
 export default function App() {
   return (

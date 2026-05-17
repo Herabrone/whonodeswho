@@ -1,5 +1,5 @@
 /**
- * RelationFlow — GLOBAL STORE  (THE INTEGRATION CONTRACT)
+ * whoNodeswho — GLOBAL STORE  (THE INTEGRATION CONTRACT)
  * =======================================================
  * Every parallel track integrates through this store and ONLY through this
  * store. All state slices and actions are declared here in Phase 0 so that:

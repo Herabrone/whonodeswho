@@ -150,6 +150,7 @@ export class GraphService {
           id: person.id,
           userId,
           name: person.name,
+          aliasesJson: JSON.stringify(person.aliases ?? []),
           notes: person.notes ?? null,
           color: person.color ?? null,
           createdAt: this.toDate(person.createdAt),
@@ -182,9 +183,11 @@ export class GraphService {
   }
 
   private toContractPerson(person: Person): ContractPerson {
+    const aliases = this.parseAliases(person.aliasesJson);
     return {
       id: person.id,
       name: person.name,
+      ...(aliases.length > 0 ? { aliases } : {}),
       ...(person.notes ? { notes: person.notes } : {}),
       ...(person.color ? { color: person.color } : {}),
       createdAt: person.createdAt.toISOString(),
@@ -224,6 +227,17 @@ export class GraphService {
   private toDate(value: string): Date {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? new Date() : date;
+  }
+
+  private parseAliases(value: string): string[] {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === 'string')
+        : [];
+    } catch {
+      return [];
+    }
   }
 
   private isPersistedState(value: unknown): value is PersistedState {

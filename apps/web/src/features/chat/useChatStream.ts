@@ -7,7 +7,8 @@ import { apiPost } from "../../lib/apiClient";
 import { useGraphStore } from "../../store/useGraphStore";
 import type { ChatMessage, PendingChatAction } from "./chat.types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+// Empty string means "use Vite proxy / same origin". Only set for non-proxied deploys.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 function newMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

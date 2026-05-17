@@ -328,7 +328,7 @@ export function CrudFeature() {
 
   const exportJson = () => {
     const graph: GraphData = { people, relationships };
-    downloadTextFile("relationflow-graph.json", JSON.stringify(graph, null, 2), "application/json");
+    downloadTextFile("whonodeswho-graph.json", JSON.stringify(graph, null, 2), "application/json");
   };
 
   const exportPeopleCsv = () => {
@@ -343,7 +343,7 @@ export function CrudFeature() {
         p.updatedAt,
       ]),
     );
-    downloadTextFile("relationflow-people.csv", csv, "text/csv");
+    downloadTextFile("whonodeswho-people.csv", csv, "text/csv");
   };
 
   const exportRelationshipsCsv = () => {
@@ -381,7 +381,7 @@ export function CrudFeature() {
         r.updatedAt,
       ]),
     );
-    downloadTextFile("relationflow-relationships.csv", csv, "text/csv");
+    downloadTextFile("whonodeswho-relationships.csv", csv, "text/csv");
   };
 
   const importJsonFile = async (file: File) => {

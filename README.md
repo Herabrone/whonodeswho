@@ -1,4 +1,4 @@
-# RelationFlow
+# whoNodeswho
 
 A personal relationship graph app — map people as nodes and their
 relationships as colored edges, then explore your network with focus mode and

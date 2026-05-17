@@ -1,5 +1,5 @@
 /**
- * RelationFlow — PERSISTENCE CONTRACT
+ * whoNodeswho — PERSISTENCE CONTRACT
  * -----------------------------------
  * The store talks to persistence ONLY through this async interface. Today the
  * implementation is localStorage; swapping to Supabase/Postgres later means

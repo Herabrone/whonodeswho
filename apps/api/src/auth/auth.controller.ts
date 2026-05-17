@@ -65,7 +65,7 @@ export class AuthController {
       });
     });
 
-    response.clearCookie('relationflow.sid');
+    response.clearCookie('whonodeswho.sid');
     return { user: null };
   }
 }

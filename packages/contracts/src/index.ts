@@ -1,5 +1,5 @@
 /**
- * RelationFlow — CORE TYPE CONTRACT
+ * whoNodeswho — CORE TYPE CONTRACT
  * ---------------------------------
  * Shared by the frontend and backend. Keep UI concerns out of this package.
  */
@@ -16,6 +16,7 @@ export type RelationshipDirection = "one-way" | "two-way";
 export interface Person {
   id: string;
   name: string;
+  aliases?: string[];
   notes?: string;
   color?: string;
   createdAt: string;
