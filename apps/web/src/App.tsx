@@ -1,7 +1,7 @@
 /**
  * App — composition root.
- * Hydrates the store from persistence, seeds a demo graph on first run, then
- * composes the shell, canvas, and the three parallel feature overlays.
+ * Hydrates the store from persistence, then composes the shell, canvas, and
+ * the three parallel feature overlays.
  */
 import { useEffect } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
