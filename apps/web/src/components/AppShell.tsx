@@ -9,7 +9,7 @@ import { TimelineToggleButton } from "./TimelineToggleButton";
 import { useGraphStore } from "../store/useGraphStore";
 import { useAuth } from "../auth/AuthContext";
 import { dispatchOpenImportExport } from "../features/crud/relationshipComposerEvent";
-import { useAutoLayout } from "../graph/useAutoLayout";
+
 
 interface AppShellProps {
   canvas: ReactNode;
@@ -41,7 +41,6 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
   const clearPersistenceError = useGraphStore((s) => s.clearPersistenceError);
 
   const { signOut } = useAuth();
-  const autoLayout = useAutoLayout();
 
   const applyTheme = (nextTheme: ThemeName) => {
     setTheme(nextTheme);
@@ -148,13 +147,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
             Import / Export
           </button>
 
-          <button
-            type="button"
-            onClick={autoLayout}
-            className="rounded-lg border border-rf-border bg-rf-base px-3 py-1 text-sm text-rf-text hover:bg-rf-surface"
-          >
-            Auto Reorganize
-          </button>
+          
 
           <button
             onClick={signOut}
@@ -205,6 +198,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
           </div>
         ) : null}
         {overlays}
+
         <Legend />
       </main>
     </div>

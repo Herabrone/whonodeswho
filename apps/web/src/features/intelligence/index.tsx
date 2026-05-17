@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { buildAdjacency, findShortestPath, getNodesWithinDegrees } from "../../lib/graph";
 import { useGraphStore } from "../../store/useGraphStore";
+import { useAutoLayout } from "../../graph/useAutoLayout";
+import { capitalizeWords } from "../../lib/string";
 import type { FocusDegrees } from "../../types";
 
 export function IntelligenceFeature() {
@@ -21,6 +23,7 @@ export function IntelligenceFeature() {
   const clearFocus = useGraphStore((s) => s.clearFocus);
   const setPath = useGraphStore((s) => s.setPath);
   const clearPath = useGraphStore((s) => s.clearPath);
+  const autoLayout = useAutoLayout();
 
   const byId = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
   const adjacency = useMemo(
@@ -111,7 +114,7 @@ export function IntelligenceFeature() {
                 <option value="">Focus off</option>
                 {people.map((person) => (
                   <option key={person.id} value={person.id}>
-                    {person.name}
+                    {capitalizeWords(person.name)}
                   </option>
                 ))}
               </select>
@@ -159,7 +162,23 @@ export function IntelligenceFeature() {
               Degrees between people
             </button>
 
-            {/* Clear path button removed (use inline controls instead) */}
+            {pathPersonIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { clearPath(); setPathMessage(""); }}
+                className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-muted hover:bg-rf-base hover:text-rf-text"
+              >
+                Clear path
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => autoLayout()}
+              className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
+            >
+              Auto Reorganize
+            </button>
           </div>
           {focusPersonId && focusedPersonName ? (
             <div className="mt-1 text-xs text-rf-muted">
@@ -175,7 +194,17 @@ export function IntelligenceFeature() {
       {pathPersonIds.length > 0 && (
         <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 w-[860px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
           <div className="pointer-events-auto rounded-xl border border-rf-border bg-rf-surface p-3 shadow-lg">
-            <h4 className="mb-1 text-sm font-semibold text-rf-text">Shortest path</h4>
+            <div className="mb-1 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-rf-text">Shortest path</h4>
+              <button
+                type="button"
+                onClick={() => { clearPath(); setPathMessage(""); }}
+                className="rounded border border-rf-border px-2 py-1 text-xs text-rf-muted hover:bg-rf-base hover:text-rf-text"
+                aria-label="Clear path"
+              >
+                × Clear
+              </button>
+            </div>
             <p className="mb-1 text-sm text-rf-text">{pathChain}</p>
             <p className="mb-2 text-xs text-rf-muted">
               {Math.max(pathPersonIds.length - 1, 0)} degree(s) of separation
@@ -185,7 +214,7 @@ export function IntelligenceFeature() {
                 <li key={hop}>{hop}</li>
               ))}
             </ul>
-            {/* Clear path button removed; clearing handled in primary controls */}
+
           </div>
         </div>
       )}
@@ -214,7 +243,7 @@ export function IntelligenceFeature() {
                   <option value="">Select person</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.name}
+                      {capitalizeWords(person.name)}
                     </option>
                   ))}
                 </select>
@@ -229,7 +258,7 @@ export function IntelligenceFeature() {
                   <option value="">Select person</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.name}
+                      {capitalizeWords(person.name)}
                     </option>
                   ))}
                 </select>

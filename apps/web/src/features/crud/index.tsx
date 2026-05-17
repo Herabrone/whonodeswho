@@ -24,6 +24,7 @@ import { YearMonthPicker } from "../timeline/YearMonthPicker";
 import useAutoRelationships, { createRelationshipKey } from "./useAutoRelationships";
 import ConfirmRelationshipsDialog, { ProposalItem } from "./ConfirmRelationshipsDialog";
 import QuickAddRelationshipsDialog from "./QuickAddRelationshipsDialog";
+import { capitalizeWords } from "../../lib/string";
 
 type ModalState =
   | { type: "none" }
@@ -64,14 +65,6 @@ const PERSON_COLORS = [
 ];
 
 const DEFAULT_EXPORT_NAME = "my-network";
-
-function capitalizeWords(value: string): string {
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
 
 function proposalKey(proposal: Pick<ProposalItem, "source" | "target" | "type">): string {
   return createRelationshipKey(proposal.source, proposal.target, proposal.type);
@@ -594,7 +587,7 @@ export function CrudFeature() {
                   </button>
                 </div>
                 <div className="mb-2 text-sm text-rf-muted">Name</div>
-                <div className="mb-3 text-base text-rf-text">{selectedPerson.name}</div>
+                <div className="mb-3 text-base text-rf-text">{capitalizeWords(selectedPerson.name)}</div>
                 <div className="mb-2 text-sm text-rf-muted">Notes</div>
                 <div className="mb-4 rounded border border-rf-border bg-rf-subtle p-2 text-sm text-rf-text">
                   {selectedPerson.notes || "No notes"}
@@ -621,7 +614,7 @@ export function CrudFeature() {
                           onClick={() => selectRelationship(rel.id)}
                           className="w-full rounded text-left hover:bg-rf-base"
                         >
-                          <div className="text-sm text-rf-text">{capitalizeWords(rel.type)} · {otherName}</div>
+                          <div className="text-sm text-rf-text">{capitalizeWords(rel.type)} · {capitalizeWords(otherName)}</div>
                           <div className="mt-1 text-xs text-rf-muted">
                             {categoryLabels[rel.category]} · {rel.direction}
                           </div>
@@ -663,7 +656,7 @@ export function CrudFeature() {
                     onClick={() => openRelationshipCreate(selectedPerson.id)}
                     className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
                   >
-                    Add relationship for {selectedPerson.name}
+                    Add relationship for {capitalizeWords(selectedPerson.name)}
                   </button>
                 </div>
 
@@ -705,11 +698,11 @@ export function CrudFeature() {
                 <dl className="space-y-2 text-sm text-rf-text">
                   <div>
                     <dt className="text-rf-muted">Source</dt>
-                    <dd>{peopleById.get(selectedRelationship.source)?.name ?? "Unknown"}</dd>
+                    <dd>{capitalizeWords(peopleById.get(selectedRelationship.source)?.name ?? "Unknown")}</dd>
                   </div>
                   <div>
                     <dt className="text-rf-muted">Target</dt>
-                    <dd>{peopleById.get(selectedRelationship.target)?.name ?? "Unknown"}</dd>
+                    <dd>{capitalizeWords(peopleById.get(selectedRelationship.target)?.name ?? "Unknown")}</dd>
                   </div>
                   <div>
                     <dt className="text-rf-muted">Category</dt>
@@ -939,7 +932,7 @@ export function CrudFeature() {
                   <option value="">Select person</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.name}
+                      {capitalizeWords(person.name)}
                     </option>
                   ))}
                 </select>
@@ -955,7 +948,7 @@ export function CrudFeature() {
                   <option value="">Select person</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.name}
+                      {capitalizeWords(person.name)}
                     </option>
                   ))}
                 </select>

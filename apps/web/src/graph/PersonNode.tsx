@@ -7,6 +7,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { categoryTokens, getCategoryGlowFilter } from "@/design-tokens";
 import type { PersonNode as PersonNodeType } from "./useGraphView";
 import { DEFAULT_PERSON_COLOR } from "../constants";
+import { capitalizeWords } from "../lib/string";
 
 export function PersonNode({ data }: NodeProps<PersonNodeType>) {
   const { person, dimmed, highlighted, onPath, searchMatch, selected } = data;
@@ -51,7 +52,7 @@ export function PersonNode({ data }: NodeProps<PersonNodeType>) {
       <Handle id="sb" type="source" position={Position.Bottom} className={handleClass} />
       <Handle id="sl" type="source" position={Position.Left} className={handleClass} />
       <span className="block text-center text-sm font-medium">
-        {person.name}
+        {capitalizeWords(person.name)}
       </span>
     </div>
   );

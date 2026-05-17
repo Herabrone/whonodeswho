@@ -3,6 +3,7 @@ import type { Person, RelationshipInput } from "../../types";
 import { CATEGORIES, RELATIONSHIP_CATALOG } from "../../constants";
 import { useGraphStore } from "../../store/useGraphStore";
 import useAutoRelationships from "./useAutoRelationships";
+import { capitalizeWords } from "../../lib/string";
 
 interface PerPersonConfig {
   category: typeof CATEGORIES[number];
@@ -135,7 +136,7 @@ export default function QuickAddRelationshipsDialog({ open, person, onClose }: P
 
         {step === 1 ? (
           <div>
-            <p className="mb-3 text-sm text-rf-muted">Select existing people to connect with {person.name}.</p>
+            <p className="mb-3 text-sm text-rf-muted">Select existing people to connect with {capitalizeWords(person.name)}.</p>
             <div className="mb-3">
               <input
                 value={search}
@@ -152,7 +153,7 @@ export default function QuickAddRelationshipsDialog({ open, person, onClose }: P
               {matches.map((p) => (
                 <li key={p.id} className="flex items-center gap-3">
                   <input type="checkbox" checked={selectedIds.includes(p.id)} onChange={() => toggleSelect(p.id)} />
-                  <div className="flex-1 text-sm text-rf-text">{p.name}</div>
+                  <div className="flex-1 text-sm text-rf-text">{capitalizeWords(p.name)}</div>
                 </li>
               ))}
               {matches.length === 0 && <li className="px-2 py-2 text-xs text-rf-muted">No matches</li>}
@@ -183,7 +184,7 @@ export default function QuickAddRelationshipsDialog({ open, person, onClose }: P
                 return (
                   <div key={id} className="rounded border border-rf-border bg-rf-subtle p-3">
                     <div className="mb-2 flex items-center gap-3">
-                      <strong className="text-sm">{other.name}</strong>
+                      <strong className="text-sm">{capitalizeWords(other.name)}</strong>
                     </div>
 
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
