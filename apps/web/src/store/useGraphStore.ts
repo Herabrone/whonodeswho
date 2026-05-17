@@ -28,6 +28,7 @@ import {
   CATEGORIES,
   CATEGORY_COLORS,
   CATEGORY_LABELS,
+  getReciprocalRelationshipType,
   RELATIONSHIP_CATALOG,
 } from "../constants";
 import { newId, nowIso } from "../lib/id";
@@ -173,6 +174,33 @@ type GraphStoreSet = Parameters<StateCreator<GraphStore>>[0];
 // ---------------------------------------------------------------------------
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function normalizeRelationshipType(type: string): string {
+  return type.trim().toLowerCase();
+}
+
+function buildRelationship(input: RelationshipInput): Relationship {
+  const timestamp = nowIso();
+  return {
+    ...input,
+    id: newId(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+function hasRelationship(
+  relationships: Relationship[],
+  candidate: Pick<RelationshipInput, "source" | "target" | "type">,
+): boolean {
+  const normalizedType = normalizeRelationshipType(candidate.type);
+  return relationships.some(
+    (relationship) =>
+      relationship.source === candidate.source &&
+      relationship.target === candidate.target &&
+      normalizeRelationshipType(relationship.type) === normalizedType,
+  );
+}
 
 function clearScheduledSave() {
   if (saveTimer) {
@@ -467,13 +495,32 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   addRelationship: (input) => {
-    const relationship: Relationship = {
-      ...input,
-      id: newId(),
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    };
-    set((s) => ({ relationships: [...s.relationships, relationship] }));
+    const relationship = buildRelationship(input);
+    set((s) => {
+      const nextRelationships = [...s.relationships, relationship];
+      const reciprocalType = getReciprocalRelationshipType(input.type);
+
+      if (!reciprocalType) {
+        return { relationships: nextRelationships };
+      }
+
+      const reciprocalInput: RelationshipInput = {
+        ...input,
+        source: input.target,
+        target: input.source,
+        type: reciprocalType,
+        direction: "one-way",
+        autoCreatedReciprocalOfId: relationship.id,
+      };
+
+      if (hasRelationship(s.relationships, reciprocalInput)) {
+        return { relationships: nextRelationships };
+      }
+
+      return {
+        relationships: [...nextRelationships, buildRelationship(reciprocalInput)],
+      };
+    });
     scheduleSave(get, set);
     return relationship;
   },
@@ -488,11 +535,21 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   deleteRelationship: (id) => {
-    set((s) => ({
-      relationships: s.relationships.filter((r) => r.id !== id),
-      selectedRelationshipId:
-        s.selectedRelationshipId === id ? null : s.selectedRelationshipId,
-    }));
+    set((s) => {
+      const idsToDelete = new Set(
+        s.relationships
+          .filter((relationship) => relationship.id === id || relationship.autoCreatedReciprocalOfId === id)
+          .map((relationship) => relationship.id),
+      );
+
+      return {
+        relationships: s.relationships.filter((relationship) => !idsToDelete.has(relationship.id)),
+        selectedRelationshipId:
+          s.selectedRelationshipId && idsToDelete.has(s.selectedRelationshipId)
+            ? null
+            : s.selectedRelationshipId,
+      };
+    });
     scheduleSave(get, set);
   },
 

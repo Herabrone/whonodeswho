@@ -51,6 +51,7 @@ export interface Relationship {
   color?: string;
   notes?: string;
   phases?: RelationshipPhase[];
+  autoCreatedReciprocalOfId?: string;
   createdAt: string;
   updatedAt: string;
 }

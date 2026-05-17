@@ -18,11 +18,16 @@ import type {
 import {
   OPEN_RELATIONSHIP_COMPOSER_EVENT,
   type OpenRelationshipComposerDetail,
+  OPEN_IMPORT_EXPORT_EVENT,
+  OPEN_QUICK_ADD_RELATIONSHIPS_EVENT,
+  type OpenQuickAddRelationshipsDetail,
 } from "./relationshipComposerEvent";
 import { YearMonthPicker } from "../timeline/YearMonthPicker";
 import { validateRelationshipDrafts } from "../../domain/rules/validationRules";
 import { createRelationshipKey, inferAutoRelationships } from "./useAutoRelationships";
 import ConfirmRelationshipsDialog, { ProposalItem } from "./ConfirmRelationshipsDialog";
+import QuickAddRelationshipsDialog from "./QuickAddRelationshipsDialog";
+import { capitalizeWords } from "../../lib/string";
 
 type ModalState =
   | { type: "none" }
@@ -64,13 +69,7 @@ const PERSON_COLORS = [
   "#7b2cbf",
 ];
 
-function capitalizeWords(value: string): string {
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+const DEFAULT_EXPORT_NAME = "my-network";
 
 function proposalKey(proposal: Pick<ProposalItem, "source" | "target" | "type">): string {
   return createRelationshipKey(proposal.source, proposal.target, proposal.type);
@@ -187,6 +186,7 @@ export function CrudFeature() {
   const [importMessage, setImportMessage] = useState("");
   const [personDraft, setPersonDraft] = useState<PersonDraft>(initialPersonDraft());
   const [personError, setPersonError] = useState("");
+  const [exportFileName, setExportFileName] = useState<string>(DEFAULT_EXPORT_NAME);
   const [relationshipDraft, setRelationshipDraft] = useState<RelationshipDraft>(initialRelationshipDraft());
   const [relationshipError, setRelationshipError] = useState("");
   const [endConfirmId, setEndConfirmId] = useState<string | null>(null);
@@ -194,12 +194,14 @@ export function CrudFeature() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPrimary, setConfirmPrimary] = useState<ProposalItem | null>(null);
   const [confirmProposals, setConfirmProposals] = useState<ProposalItem[]>([]);
+  const [quickAddPerson, setQuickAddPerson] = useState<Person | null>(null);
   const [confirmWarnings, setConfirmWarnings] = useState<string[]>([]);
   const [declinedProposalKeys, setDeclinedProposalKeys] = useState<Set<string>>(() => new Set());
 
   const jsonInputRef = useRef<HTMLInputElement | null>(null);
   const csvPeopleInputRef = useRef<HTMLInputElement | null>(null);
   const csvRelationshipsInputRef = useRef<HTMLInputElement | null>(null);
+  const personNameRef = useRef<HTMLInputElement | null>(null);
 
   const people = useGraphStore((s) => s.people);
   const relationships = useGraphStore((s) => s.relationships);
@@ -275,10 +277,28 @@ export function CrudFeature() {
     };
 
     window.addEventListener(OPEN_RELATIONSHIP_COMPOSER_EVENT, onOpenComposer);
+    const onOpenImportExport = () => setModal({ type: "import-export" });
+    window.addEventListener(OPEN_IMPORT_EXPORT_EVENT, onOpenImportExport);
+
+    const onOpenQuickAdd = (event: Event) => {
+      const customEvent = event as CustomEvent<OpenQuickAddRelationshipsDetail>;
+      const p = people.find((x) => x.id === customEvent.detail.personId);
+      if (p) setQuickAddPerson(p);
+    };
+    window.addEventListener(OPEN_QUICK_ADD_RELATIONSHIPS_EVENT, onOpenQuickAdd);
+
     return () => {
       window.removeEventListener(OPEN_RELATIONSHIP_COMPOSER_EVENT, onOpenComposer);
+      window.removeEventListener(OPEN_IMPORT_EXPORT_EVENT, onOpenImportExport);
+      window.removeEventListener(OPEN_QUICK_ADD_RELATIONSHIPS_EVENT, onOpenQuickAdd);
     };
-  }, []);
+  }, [people]); // dependency on people since we use it in the event listener
+
+  function sanitizeFileName(name: string) {
+    if (!name) return "";
+    // Allow letters, numbers, dash, underscore. Strip everything else.
+    return name.replace(/[^a-zA-Z0-9-_]/g, "").trim();
+  }
 
   const openRelationshipEdit = (relationship: Relationship) => {
     setRelationshipDraft(initialRelationshipDraft(relationship));
@@ -293,6 +313,17 @@ export function CrudFeature() {
     setRelationshipError("");
     setEndConfirmId(null);
   };
+
+  useEffect(() => {
+    if (modal.type === "person-create") {
+      // focus and select the name input when opening the Add Person modal
+      // use a microtask to ensure the input is mounted
+      setTimeout(() => {
+        personNameRef.current?.focus();
+        personNameRef.current?.select();
+      }, 0);
+    }
+  }, [modal.type]);
 
   const rememberDeclinedProposals = (proposals: ProposalItem[]) => {
     if (proposals.length === 0) return;
@@ -321,7 +352,11 @@ export function CrudFeature() {
     if (modal.type === "person-edit") {
       updatePerson(modal.person.id, payload);
     } else {
-      addPerson(payload);
+      const created = addPerson(payload);
+      // Close the person modal, then open quick-add relationships for the created person
+      closeModal();
+      setQuickAddPerson(created);
+      return;
     }
     closeModal();
   };
@@ -451,7 +486,8 @@ export function CrudFeature() {
 
   const exportJson = () => {
     const graph: GraphData = { people, relationships };
-    downloadTextFile("whonodeswho-graph.json", JSON.stringify(graph, null, 2), "application/json");
+    const base = sanitizeFileName(exportFileName) || DEFAULT_EXPORT_NAME;
+    downloadTextFile(`${base}.json`, JSON.stringify(graph, null, 2), "application/json");
   };
 
   const exportPeopleCsv = () => {
@@ -466,7 +502,8 @@ export function CrudFeature() {
         p.updatedAt,
       ]),
     );
-    downloadTextFile("whonodeswho-people.csv", csv, "text/csv");
+    const base = sanitizeFileName(exportFileName) || DEFAULT_EXPORT_NAME;
+    downloadTextFile(`${base}-people.csv`, csv, "text/csv");
   };
 
   const exportRelationshipsCsv = () => {
@@ -504,7 +541,8 @@ export function CrudFeature() {
         r.updatedAt,
       ]),
     );
-    downloadTextFile("whonodeswho-relationships.csv", csv, "text/csv");
+    const base = sanitizeFileName(exportFileName) || DEFAULT_EXPORT_NAME;
+    downloadTextFile(`${base}-relationships.csv`, csv, "text/csv");
   };
 
   const importJsonFile = async (file: File) => {
@@ -563,13 +601,7 @@ export function CrudFeature() {
           >
             + Relationship
           </button>
-          <button
-            type="button"
-            onClick={() => setModal({ type: "import-export" })}
-            className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
-          >
-            Import / Export
-          </button>
+          
         </div>
       </div>
 
@@ -589,7 +621,7 @@ export function CrudFeature() {
                   </button>
                 </div>
                 <div className="mb-2 text-sm text-rf-muted">Name</div>
-                <div className="mb-3 text-base text-rf-text">{selectedPerson.name}</div>
+                <div className="mb-3 text-base text-rf-text">{capitalizeWords(selectedPerson.name)}</div>
                 <div className="mb-2 text-sm text-rf-muted">Notes</div>
                 <div className="mb-4 rounded border border-rf-border bg-rf-subtle p-2 text-sm text-rf-text">
                   {selectedPerson.notes || "No notes"}
@@ -616,7 +648,7 @@ export function CrudFeature() {
                           onClick={() => selectRelationship(rel.id)}
                           className="w-full rounded text-left hover:bg-rf-base"
                         >
-                          <div className="text-sm text-rf-text">{capitalizeWords(rel.type)} · {otherName}</div>
+                          <div className="text-sm text-rf-text">{capitalizeWords(rel.type)} · {capitalizeWords(otherName)}</div>
                           <div className="mt-1 text-xs text-rf-muted">
                             {categoryLabels[rel.category]} · {rel.direction}
                           </div>
@@ -658,7 +690,7 @@ export function CrudFeature() {
                     onClick={() => openRelationshipCreate(selectedPerson.id)}
                     className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
                   >
-                    Add relationship for {selectedPerson.name}
+                    Add relationship for {capitalizeWords(selectedPerson.name)}
                   </button>
                 </div>
 
@@ -700,11 +732,11 @@ export function CrudFeature() {
                 <dl className="space-y-2 text-sm text-rf-text">
                   <div>
                     <dt className="text-rf-muted">Source</dt>
-                    <dd>{peopleById.get(selectedRelationship.source)?.name ?? "Unknown"}</dd>
+                    <dd>{capitalizeWords(peopleById.get(selectedRelationship.source)?.name ?? "Unknown")}</dd>
                   </div>
                   <div>
                     <dt className="text-rf-muted">Target</dt>
-                    <dd>{peopleById.get(selectedRelationship.target)?.name ?? "Unknown"}</dd>
+                    <dd>{capitalizeWords(peopleById.get(selectedRelationship.target)?.name ?? "Unknown")}</dd>
                   </div>
                   <div>
                     <dt className="text-rf-muted">Category</dt>
@@ -847,7 +879,13 @@ export function CrudFeature() {
 
       {(modal.type === "person-create" || modal.type === "person-edit") && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-4">
-          <div className="w-[520px] max-w-full rounded-xl border border-rf-border bg-rf-surface p-4 shadow-xl">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitPerson();
+            }}
+            className="w-[520px] max-w-full rounded-xl border border-rf-border bg-rf-surface p-4 shadow-xl"
+          >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-display text-lg text-rf-text">
                 {modal.type === "person-edit" ? "Edit person" : "Add person"}
@@ -865,6 +903,7 @@ export function CrudFeature() {
               <label className="block text-sm text-rf-text">
                 Name
                 <input
+                  ref={personNameRef}
                   value={personDraft.name}
                   onChange={(e) => setPersonDraft((d) => ({ ...d, name: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
@@ -912,14 +951,13 @@ export function CrudFeature() {
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={submitPerson}
+                type="submit"
                 className="rounded-lg bg-rf-accent px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
               >
                 Save
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 
@@ -950,7 +988,7 @@ export function CrudFeature() {
                   <option value="">Select person</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.name}
+                      {capitalizeWords(person.name)}
                     </option>
                   ))}
                 </select>
@@ -966,7 +1004,7 @@ export function CrudFeature() {
                   <option value="">Select person</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.name}
+                      {capitalizeWords(person.name)}
                     </option>
                   ))}
                 </select>
@@ -1165,6 +1203,18 @@ export function CrudFeature() {
               </button>
             </div>
 
+            <div className="mb-3">
+              <label className="block text-sm text-rf-text">
+                File name
+                <input
+                  value={exportFileName}
+                  onChange={(e) => setExportFileName(e.target.value)}
+                  placeholder={DEFAULT_EXPORT_NAME}
+                  className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
+                />
+              </label>
+            </div>
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <section className="rounded-lg border border-rf-border bg-rf-subtle p-3">
                 <h4 className="mb-2 text-sm font-semibold text-rf-text">JSON</h4>
@@ -1271,6 +1321,13 @@ export function CrudFeature() {
           onCancel={handleCancelConfirm}
           onAddAll={handleConfirmAddAll}
           onAddPrimaryOnly={handleAddPrimaryOnly}
+        />
+      )}
+      {quickAddPerson && (
+        <QuickAddRelationshipsDialog
+          open={!!quickAddPerson}
+          person={quickAddPerson}
+          onClose={() => setQuickAddPerson(null)}
         />
       )}
     </>

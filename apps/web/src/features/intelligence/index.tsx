@@ -1,10 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildAdjacency, findShortestPath, getNodesWithinDegrees } from "../../lib/graph";
 import { useGraphStore } from "../../store/useGraphStore";
+import { useAutoLayout } from "../../graph/useAutoLayout";
+import { capitalizeWords } from "../../lib/string";
 import type { FocusDegrees } from "../../types";
+import { OPEN_PATH_MODAL_EVENT } from "./pathEvent";
 
 export function IntelligenceFeature() {
   const [pathModalOpen, setPathModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setPathModalOpen(true);
+    window.addEventListener(OPEN_PATH_MODAL_EVENT, handler);
+    return () => window.removeEventListener(OPEN_PATH_MODAL_EVENT, handler);
+  }, []);
+
   const [personAId, setPersonAId] = useState("");
   const [personBId, setPersonBId] = useState("");
   const [pathMessage, setPathMessage] = useState("");
@@ -21,6 +31,7 @@ export function IntelligenceFeature() {
   const clearFocus = useGraphStore((s) => s.clearFocus);
   const setPath = useGraphStore((s) => s.setPath);
   const clearPath = useGraphStore((s) => s.clearPath);
+  const autoLayout = useAutoLayout();
 
   const byId = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
   const adjacency = useMemo(
@@ -92,9 +103,9 @@ export function IntelligenceFeature() {
 
   return (
     <>
-      <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 w-[860px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
-        <div className="pointer-events-auto rounded-xl border border-rf-border bg-rf-surface p-3 shadow-lg backdrop-blur">
-          <div className="flex flex-wrap items-center gap-2">
+       <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 w-[720px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
+         <div className="pointer-events-auto rounded-xl border border-rf-border bg-rf-surface p-2 shadow-lg backdrop-blur">
+          <div className="flex flex-wrap items-center gap-1">
             <div className="flex items-center gap-2">
               <select
                 value={focusPersonId ?? ""}
@@ -111,7 +122,7 @@ export function IntelligenceFeature() {
                 <option value="">Focus off</option>
                 {people.map((person) => (
                   <option key={person.id} value={person.id}>
-                    {person.name}
+                    {capitalizeWords(person.name)}
                   </option>
                 ))}
               </select>
@@ -159,31 +170,49 @@ export function IntelligenceFeature() {
               Degrees between people
             </button>
 
+            {pathPersonIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { clearPath(); setPathMessage(""); }}
+                className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-muted hover:bg-rf-base hover:text-rf-text"
+              >
+                Clear path
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => {
-                clearPath();
-                setPathMessage("");
-              }}
+              onClick={() => autoLayout()}
               className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
             >
-              Clear path
+              Auto Reorganize
             </button>
           </div>
-
-          <div className="mt-2 text-xs text-rf-muted">
-            {focusPersonId && focusedPersonName
-              ? `Showing ${focusedPersonName} + ${Math.max(focusCount - 1, 0)} people within ${String(focusDegrees)} degree(s).`
-              : "Focus mode is off."}
-          </div>
+          {focusPersonId && focusedPersonName ? (
+            <div className="mt-1 text-xs text-rf-muted">
+              {`Showing ${focusedPersonName} + ${Math.max(focusCount - 1, 0)} people within ${String(
+                focusDegrees,
+              )} degree(s).`}
+            </div>
+          ) : null}
           {pathMessage && <div className="mt-1 text-xs text-rf-muted">{pathMessage}</div>}
-        </div>
-      </div>
+         </div>
+       </div>
 
       {pathPersonIds.length > 0 && (
         <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 w-[860px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
           <div className="pointer-events-auto rounded-xl border border-rf-border bg-rf-surface p-3 shadow-lg">
-            <h4 className="mb-1 text-sm font-semibold text-rf-text">Shortest path</h4>
+            <div className="mb-1 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-rf-text">Shortest path</h4>
+              <button
+                type="button"
+                onClick={() => { clearPath(); setPathMessage(""); }}
+                className="rounded border border-rf-border px-2 py-1 text-xs text-rf-muted hover:bg-rf-base hover:text-rf-text"
+                aria-label="Clear path"
+              >
+                × Clear
+              </button>
+            </div>
             <p className="mb-1 text-sm text-rf-text">{pathChain}</p>
             <p className="mb-2 text-xs text-rf-muted">
               {Math.max(pathPersonIds.length - 1, 0)} degree(s) of separation
@@ -193,16 +222,7 @@ export function IntelligenceFeature() {
                 <li key={hop}>{hop}</li>
               ))}
             </ul>
-            <button
-              type="button"
-              onClick={() => {
-                clearPath();
-                setPathMessage("");
-              }}
-              className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-1.5 text-xs text-rf-text hover:bg-rf-base"
-            >
-              Clear path
-            </button>
+
           </div>
         </div>
       )}
@@ -231,7 +251,7 @@ export function IntelligenceFeature() {
                   <option value="">Select person</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.name}
+                      {capitalizeWords(person.name)}
                     </option>
                   ))}
                 </select>
@@ -246,7 +266,7 @@ export function IntelligenceFeature() {
                   <option value="">Select person</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.name}
+                      {capitalizeWords(person.name)}
                     </option>
                   ))}
                 </select>

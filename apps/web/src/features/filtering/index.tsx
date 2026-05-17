@@ -4,6 +4,7 @@ import {
   WEAK_RELATIONSHIP_TYPES,
 } from "../../constants";
 import { useGraphStore } from "../../store/useGraphStore";
+import { capitalizeWords } from "../../lib/string";
 
 export function FilteringFeature() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -75,13 +76,13 @@ export function FilteringFeature() {
                           <button
                             type="button"
                             onClick={() => {
-                              setSearchQuery(person.name);
+                              setSearchQuery(capitalizeWords(person.name));
                               selectPerson(person.id);
                               setSearchFocused(false);
                             }}
                             className="block w-full px-3 py-2 text-left text-sm text-rf-text hover:bg-rf-base"
                           >
-                            {person.name}
+                            {capitalizeWords(person.name)}
                           </button>
                         </li>
                       ))}

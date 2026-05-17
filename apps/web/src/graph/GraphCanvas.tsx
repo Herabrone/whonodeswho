@@ -25,12 +25,131 @@ import { PersonNode } from "./PersonNode";
 import { useGraphView } from "./useGraphView";
 import { useGraphStore } from "../store/useGraphStore";
 import { FloatingEdge } from "./FloatingEdge";
-import { dispatchOpenRelationshipComposer } from "../features/crud/relationshipComposerEvent";
+import {
+  dispatchOpenRelationshipComposer,
+  dispatchOpenQuickAddRelationships,
+} from "../features/crud/relationshipComposerEvent";
+import { dispatchOpenPathModal } from "../features/intelligence/pathEvent";
 import { CategoryNode } from "./CategoryNode";
 import { CATEGORY_COLORS } from "../constants";
+import { capitalizeWords } from "../lib/string";
 
 const nodeTypes = { person: PersonNode, category: CategoryNode };
 const edgeTypes = { relationship: FloatingEdge };
+
+// ─── Person Context Menu ───────────────────────────────────────────────────────
+function ContextMenu({
+  id,
+  top,
+  left,
+  right,
+  bottom,
+  onClose,
+}: {
+  id: string;
+  top?: number;
+  left?: number;
+  right?: number;
+  bottom?: number;
+  onClose: () => void;
+}) {
+  const person = useGraphStore((s) => s.people.find((p) => p.id === id));
+  const deletePerson = useGraphStore((s) => s.deletePerson);
+  const setFocus = useGraphStore((s) => s.setFocus);
+  const setTreeRoot = useGraphStore((s) => s.setTreeRoot);
+  const updatePerson = useGraphStore((s) => s.updatePerson);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(person?.name ?? "");
+
+  if (!person) return null;
+
+  const handleAction = (fn: () => void) => {
+    fn();
+    onClose();
+  };
+
+  const handleRename = () => {
+    if (editName.trim() && editName.trim() !== person.name) {
+      updatePerson(id, { name: editName.trim() });
+    }
+    setIsEditing(false);
+  };
+
+  return (
+    <div
+      style={{ top, left, right, bottom }}
+      className="absolute z-50 min-w-[160px] overflow-hidden rounded-xl border border-rf-border bg-rf-surface/95 p-1 shadow-2xl backdrop-blur-md"
+      onMouseLeave={onClose}
+    >
+      <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-rf-muted">
+        {person.name}
+      </div>
+
+      <div className="space-y-0.5">
+        {isEditing ? (
+          <div className="px-2 py-1">
+            <input
+              autoFocus
+              className="w-full rounded border border-rf-border bg-rf-subtle px-2 py-1 text-sm text-rf-text outline-none focus:border-rf-primary"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleRename();
+                if (e.key === "Escape") setIsEditing(false);
+              }}
+              onBlur={handleRename}
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="flex w-full items-center px-3 py-2 text-left text-sm text-rf-text hover:bg-rf-subtle"
+          >
+            Rename
+          </button>
+        )}
+
+        <button
+          onClick={() => handleAction(() => setFocus(id))}
+          className="flex w-full items-center px-3 py-2 text-left text-sm text-rf-text hover:bg-rf-subtle"
+        >
+          Focus on {capitalizeWords(person.name)}
+        </button>
+
+        <button
+          onClick={() => handleAction(() => setTreeRoot(id))}
+          className="flex w-full items-center px-3 py-2 text-left text-sm text-rf-text hover:bg-rf-subtle"
+        >
+          Set as Tree Root
+        </button>
+
+        <button
+          onClick={() => handleAction(() => dispatchOpenQuickAddRelationships({ personId: id }))}
+          className="flex w-full items-center px-3 py-2 text-left text-sm text-rf-text hover:bg-rf-subtle"
+        >
+          Add Relationships...
+        </button>
+
+        <button
+          onClick={() => handleAction(() => dispatchOpenPathModal())}
+          className="flex w-full items-center px-3 py-2 text-left text-sm text-rf-text hover:bg-rf-subtle"
+        >
+          Find Path to...
+        </button>
+
+        <div className="my-1 border-t border-rf-border" />
+
+        <button
+          onClick={() => handleAction(() => deletePerson(id))}
+          className="flex w-full items-center px-3 py-2 text-left text-sm text-red-500 hover:bg-red-500/10"
+        >
+          Delete Person
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── Custom Canvas MiniMap ─────────────────────────────────────────────────────
 // Draws nodes (colored), edges (colored), and a live viewport overlay rectangle.
@@ -229,6 +348,8 @@ function MinimapContainer({ nodes, edges }: { nodes: any[]; edges: any[] }) {
           justifyContent: "center",
           fontSize: 10,
           zIndex: 1,
+          transform: isCollapsed ? `translateX(${PANEL_W}px)` : "translateX(0)",
+          transition: "transform 300ms ease",
         }}
       >
         {isCollapsed ? "\u25C0" : "\u25B6"}
@@ -267,6 +388,52 @@ export function GraphCanvas() {
   const treeShape = useGraphStore((s) => s.treeShape);
   const treeRootId = useGraphStore((s) => s.treeRootId);
   const setTreeRoot = useGraphStore((s) => s.setTreeRoot);
+  const [menu, setMenu] = useState<{
+    id: string;
+    top?: number;
+    left?: number;
+    right?: number;
+    bottom?: number;
+  } | null>(null);
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: any) => {
+      event.preventDefault();
+
+      const personId =
+        typeof node.data === "object" && node.data !== null
+          ? (node.data as { person?: { id?: string } }).person?.id
+          : undefined;
+
+      if (!personId) return;
+
+      const pane = document.querySelector(".react-flow__pane")?.getBoundingClientRect();
+      if (!pane) return;
+
+      // Position logic: keep inside pane boundaries
+      const PANE_W = pane.width;
+      const PANE_H = pane.height;
+      const MENU_W = 180;
+      const MENU_H = 260;
+
+      let left: number | undefined = event.clientX - pane.left;
+      let top: number | undefined = event.clientY - pane.top;
+      let right: number | undefined = undefined;
+      let bottom: number | undefined = undefined;
+
+      if (left + MENU_W > PANE_W) {
+        left = undefined;
+        right = PANE_W - (event.clientX - pane.left);
+      }
+      if (top + MENU_H > PANE_H) {
+        top = undefined;
+        bottom = PANE_H - (event.clientY - pane.top);
+      }
+
+      setMenu({ id: personId, top, left, right, bottom });
+    },
+    [setMenu],
+  );
 
   // Commit drag positions straight to the store; the derived nodes react.
   const onNodesChange = useCallback(
@@ -347,9 +514,13 @@ export function GraphCanvas() {
       onNodesChange={onNodesChange}
       onNodeClick={onNodeClick}
       onNodeDoubleClick={onNodeDoubleClick}
+      onNodeContextMenu={onNodeContextMenu}
       onEdgeClick={onEdgeClick}
       onConnect={onConnect}
-      onPaneClick={clearSelection}
+      onPaneClick={() => {
+        clearSelection();
+        setMenu(null);
+      }}
       nodesDraggable={layoutMode === "free"}
       zoomOnDoubleClick={layoutMode !== "tree"}
       fitView
@@ -371,6 +542,7 @@ export function GraphCanvas() {
         }}
       />
       <MinimapContainer nodes={nodes} edges={edges} />
+      {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
       <ViewportPortal>
         {layoutMode === "tree" && treeShape === "grouped" && groupedDivider ? (
           <div
@@ -392,17 +564,18 @@ export function GraphCanvas() {
                   position: "absolute",
                   transform: `translate(${item.position.x}px, ${item.position.y}px) translate(-50%, -50%)`,
                   color: item.color,
-                  fontSize: 12,
-                  letterSpacing: "0.08em",
+                  fontSize: 16,
+                  letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  fontWeight: 600,
-                  opacity: 0.92,
+                  fontWeight: 800,
+                  opacity: 0.95,
                   pointerEvents: "none",
                   background: "var(--rf-graph-control-bg)",
-                  border: "1px solid var(--rf-graph-control-border)",
+                  border: "2px solid var(--rf-graph-control-border)",
                   backdropFilter: "blur(14px)",
                   borderRadius: 999,
-                  padding: "2px 8px",
+                  padding: "4px 12px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                 }}
               >
                 {item.label}

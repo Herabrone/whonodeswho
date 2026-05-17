@@ -76,6 +76,7 @@ export function ConfirmRelationshipsDialog({
   const selected = useMemo(() => local.filter((p) => p.checked), [local]);
   const declined = useMemo(() => local.filter((p) => !p.checked), [local]);
   const allSelected = local.length > 0 && selected.length === local.length;
+  const noneSelected = selected.length === 0;
 
   if (!open) return null;
 
@@ -107,13 +108,24 @@ export function ConfirmRelationshipsDialog({
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="text-sm text-muted">Relationship suggestions</div>
             {local.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setAllChecked(!allSelected)}
-                className="rounded border border-line bg-canvas px-2.5 py-1 text-xs font-medium text-ink hover:bg-panel"
-              >
-                {allSelected ? "Clear All" : "Select All"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAllChecked(true)}
+                  disabled={allSelected}
+                  className="rounded border border-line bg-canvas px-2.5 py-1 text-xs font-medium text-ink hover:bg-panel disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAllChecked(false)}
+                  disabled={noneSelected}
+                  className="rounded border border-line bg-canvas px-2.5 py-1 text-xs font-medium text-ink hover:bg-panel disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Deselect All
+                </button>
+              </div>
             ) : null}
           </div>
           {local.length === 0 ? (
