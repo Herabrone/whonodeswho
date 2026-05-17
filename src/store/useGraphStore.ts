@@ -22,7 +22,12 @@ import type {
   RelationshipInput,
   XYPosition,
 } from "../types";
-import { CATEGORIES } from "../constants";
+import {
+  CATEGORIES,
+  CATEGORY_COLORS,
+  CATEGORY_LABELS,
+  RELATIONSHIP_CATALOG,
+} from "../constants";
 import { newId, nowIso } from "../lib/id";
 import { persistenceStore } from "./localStorageStore";
 import { EMPTY_STATE } from "./persistence";
@@ -35,6 +40,10 @@ interface DataSlice {
   people: Person[];
   relationships: Relationship[];
   positions: Record<string, XYPosition>;
+  // Legend State
+  categoryLabels: Record<RelationshipCategory, string>;
+  relationshipColors: Record<RelationshipCategory, string>;
+  relationshipCatalog: Record<RelationshipCategory, string[]>;
 }
 
 interface SelectionSlice {
@@ -100,6 +109,12 @@ export interface GraphStore
   clearFocus: () => void;
   setPath: (personIds: string[]) => void;
   clearPath: () => void;
+
+  // -- legend actions (Contract Amendment) --
+  updateCategoryLabel: (category: RelationshipCategory, label: string) => void;
+  updateCategoryColor: (category: RelationshipCategory, color: string) => void;
+  addRelationshipType: (category: RelationshipCategory, type: string) => void;
+  removeRelationshipType: (category: RelationshipCategory, type: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +144,12 @@ const VIEW_DEFAULTS: ViewSlice = {
   searchQuery: "",
 };
 
+const LEGEND_DEFAULTS = {
+  categoryLabels: { ...CATEGORY_LABELS },
+  relationshipColors: { ...CATEGORY_COLORS },
+  relationshipCatalog: { ...RELATIONSHIP_CATALOG },
+};
+
 export const useGraphStore = create<GraphStore>((set, get) => ({
   // initial state
   people: [],
@@ -137,6 +158,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   selectedPersonId: null,
   selectedRelationshipId: null,
   ...VIEW_DEFAULTS,
+  ...LEGEND_DEFAULTS,
   focusPersonId: null,
   focusDegrees: 1,
   pathPersonIds: [],
@@ -276,6 +298,38 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   clearFocus: () => set({ focusPersonId: null }),
   setPath: (personIds) => set({ pathPersonIds: personIds }),
   clearPath: () => set({ pathPersonIds: [] }),
+
+  // -- legend actions --
+  updateCategoryLabel: (category, label) => {
+    set((s) => ({
+      categoryLabels: { ...s.categoryLabels, [category]: label }
+    }));
+    scheduleSave(get);
+  },
+  updateCategoryColor: (category, color) => {
+    set((s) => ({
+      relationshipColors: { ...s.relationshipColors, [category]: color }
+    }));
+    scheduleSave(get);
+  },
+  addRelationshipType: (category, type) => {
+    set((s) => ({
+      relationshipCatalog: {
+        ...s.relationshipCatalog,
+        [category]: [...(s.relationshipCatalog[category] || []), type]
+      }
+    }));
+    scheduleSave(get);
+  },
+  removeRelationshipType: (category, type) => {
+    set((s) => ({
+      relationshipCatalog: {
+        ...s.relationshipCatalog,
+        [category]: (s.relationshipCatalog[category] || []).filter(t => t !== type)
+      }
+    }));
+    scheduleSave(get);
+  },
 }));
 
 // ---------------------------------------------------------------------------

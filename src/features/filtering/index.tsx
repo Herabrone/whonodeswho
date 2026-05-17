@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import {
   CATEGORIES,
-  CATEGORY_COLORS,
-  CATEGORY_LABELS,
   WEAK_RELATIONSHIP_TYPES,
 } from "../../constants";
 import { useGraphStore } from "../../store/useGraphStore";
@@ -23,6 +21,8 @@ export function FilteringFeature() {
   const setSearchQuery = useGraphStore((s) => s.setSearchQuery);
   const resetView = useGraphStore((s) => s.resetView);
   const selectPerson = useGraphStore((s) => s.selectPerson);
+  const categoryLabels = useGraphStore((s) => s.categoryLabels);
+  const relationshipColors = useGraphStore((s) => s.relationshipColors);
 
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const matches = useMemo(
@@ -151,9 +151,9 @@ export function FilteringFeature() {
                         />
                         <span
                           className="inline-block h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: CATEGORY_COLORS[category] }}
+                          style={{ backgroundColor: relationshipColors[category] }}
                         />
-                        <span className="text-sm text-ink">{CATEGORY_LABELS[category]}</span>
+                        <span className="text-sm text-ink">{categoryLabels[category]}</span>
                       </label>
                     </li>
                   );

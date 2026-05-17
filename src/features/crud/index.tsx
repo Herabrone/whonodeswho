@@ -1,21 +1,979 @@
-/**
- * TRACK A — CRUD & DATA MANAGEMENT  (STUB)
- * ========================================
- * Owned by the Track A agent. Replace this stub per docs/track-a-crud-data.md.
- *
- * Reserved screen region: TOP-RIGHT (action buttons) + RIGHT DRAWER (detail
- * panels) + CENTERED MODALS (forms).
- *
- * This component is mounted by App.tsx as an overlay. The Track A agent may
- * create any files under src/features/crud/ and may edit ONLY this folder.
- * It integrates exclusively through the store actions in useGraphStore.
- */
+import { useMemo, useRef, useState } from "react";
+import {
+  CATEGORIES,
+  RELATIONSHIP_CATALOG,
+} from "../../constants";
+import {
+  useGraphStore,
+} from "../../store/useGraphStore";
+import type {
+  GraphData,
+  Person,
+  PersonInput,
+  Relationship,
+  RelationshipCategory,
+  RelationshipDirection,
+  RelationshipInput,
+} from "../../types";
+
+type ModalState =
+  | { type: "none" }
+  | { type: "person-create" }
+  | { type: "person-edit"; person: Person }
+  | { type: "relationship-create" }
+  | { type: "relationship-edit"; relationship: Relationship }
+  | { type: "import-export" };
+
+interface PersonDraft {
+  name: string;
+  notes: string;
+  color: string;
+}
+
+interface RelationshipDraft {
+  source: string;
+  target: string;
+  category: RelationshipCategory;
+  typeChoice: string;
+  customType: string;
+  direction: RelationshipDirection;
+  color: string;
+  notes: string;
+}
+
+const PERSON_COLORS = [
+  "",
+  "#1a1d24",
+  "#3b5bdb",
+  "#2f9e44",
+  "#e64980",
+  "#f08c00",
+  "#1098ad",
+  "#7b2cbf",
+];
+
+function initialPersonDraft(person?: Person): PersonDraft {
+  return {
+    name: person?.name ?? "",
+    notes: person?.notes ?? "",
+    color: person?.color ?? "",
+  };
+}
+
+function initialRelationshipDraft(relationship?: Relationship): RelationshipDraft {
+  const category = relationship?.category ?? "friend";
+  const availableTypes = RELATIONSHIP_CATALOG[category];
+  const hasCatalogType = relationship ? availableTypes.includes(relationship.type) : true;
+  return {
+    source: relationship?.source ?? "",
+    target: relationship?.target ?? "",
+    category,
+    typeChoice: relationship ? (hasCatalogType ? relationship.type : "__custom__") : availableTypes[0],
+    customType: relationship && !hasCatalogType ? relationship.type : "",
+    direction: relationship?.direction ?? "two-way",
+    color: relationship?.color ?? "",
+    notes: relationship?.notes ?? "",
+  };
+}
+
+function toCsvValue(value: string): string {
+  const escaped = value.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+function buildCsvRows(headers: string[], rows: string[][]): string {
+  const csvRows = [headers.join(",")];
+  for (const row of rows) {
+    csvRows.push(row.map((v) => toCsvValue(v)).join(","));
+  }
+  return csvRows.join("\n");
+}
+
+function parseCsv(content: string): string[][] {
+  const rows: string[][] = [];
+  let current = "";
+  let row: string[] = [];
+  let inQuotes = false;
+
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    const next = content[i + 1];
+    if (ch === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (ch === "," && !inQuotes) {
+      row.push(current);
+      current = "";
+      continue;
+    }
+    if ((ch === "\n" || ch === "\r") && !inQuotes) {
+      if (ch === "\r" && next === "\n") i++;
+      row.push(current);
+      const isMeaningful = row.some((c) => c.trim().length > 0);
+      if (isMeaningful) rows.push(row);
+      row = [];
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+
+  if (current.length > 0 || row.length > 0) {
+    row.push(current);
+    if (row.some((c) => c.trim().length > 0)) rows.push(row);
+  }
+  return rows;
+}
+
+function downloadTextFile(filename: string, content: string, type = "text/plain") {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export function CrudFeature() {
-  return (
-    <div className="pointer-events-none absolute right-4 top-4 z-20">
-      <div className="pointer-events-auto rounded-lg border border-dashed border-line bg-panel/90 px-3 py-2 text-xs text-muted">
-        Track A · CRUD &amp; Data — stub
-      </div>
-    </div>
+  const [modal, setModal] = useState<ModalState>({ type: "none" });
+  const [importMessage, setImportMessage] = useState("");
+  const [personDraft, setPersonDraft] = useState<PersonDraft>(initialPersonDraft());
+  const [personError, setPersonError] = useState("");
+  const [relationshipDraft, setRelationshipDraft] = useState<RelationshipDraft>(initialRelationshipDraft());
+  const [relationshipError, setRelationshipError] = useState("");
+
+  const jsonInputRef = useRef<HTMLInputElement | null>(null);
+  const csvPeopleInputRef = useRef<HTMLInputElement | null>(null);
+  const csvRelationshipsInputRef = useRef<HTMLInputElement | null>(null);
+
+  const people = useGraphStore((s) => s.people);
+  const relationships = useGraphStore((s) => s.relationships);
+  const selectedPersonId = useGraphStore((s) => s.selectedPersonId);
+  const selectedRelationshipId = useGraphStore((s) => s.selectedRelationshipId);
+  const selectedPerson = useMemo(
+    () => (selectedPersonId ? people.find((p) => p.id === selectedPersonId) ?? null : null),
+    [people, selectedPersonId],
   );
+  const selectedRelationship = useMemo(
+    () =>
+      selectedRelationshipId
+        ? relationships.find((r) => r.id === selectedRelationshipId) ?? null
+        : null,
+    [relationships, selectedRelationshipId],
+  );
+  const relatedToSelectedPerson = useMemo(
+    () =>
+      selectedPersonId
+        ? relationships.filter(
+            (r) => r.source === selectedPersonId || r.target === selectedPersonId,
+          )
+        : [],
+    [relationships, selectedPersonId],
+  );
+
+  const categoryLabels = useGraphStore((s) => s.categoryLabels);
+  const relationshipCatalog = useGraphStore((s) => s.relationshipCatalog);
+  const relationshipColors = useGraphStore((s) => s.relationshipColors);
+
+  const addPerson = useGraphStore((s) => s.addPerson);
+  const updatePerson = useGraphStore((s) => s.updatePerson);
+  const deletePerson = useGraphStore((s) => s.deletePerson);
+
+  const addRelationship = useGraphStore((s) => s.addRelationship);
+  const updateRelationship = useGraphStore((s) => s.updateRelationship);
+  const deleteRelationship = useGraphStore((s) => s.deleteRelationship);
+  const replaceGraph = useGraphStore((s) => s.replaceGraph);
+
+  const selectRelationship = useGraphStore((s) => s.selectRelationship);
+  const clearSelection = useGraphStore((s) => s.clearSelection);
+
+  const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
+
+  const openPersonCreate = () => {
+    setPersonDraft(initialPersonDraft());
+    setPersonError("");
+    setModal({ type: "person-create" });
+  };
+
+  const openPersonEdit = (person: Person) => {
+    setPersonDraft(initialPersonDraft(person));
+    setPersonError("");
+    setModal({ type: "person-edit", person });
+  };
+
+  const openRelationshipCreate = () => {
+    setRelationshipDraft(initialRelationshipDraft());
+    setRelationshipError("");
+    setModal({ type: "relationship-create" });
+  };
+
+  const openRelationshipEdit = (relationship: Relationship) => {
+    setRelationshipDraft(initialRelationshipDraft(relationship));
+    setRelationshipError("");
+    setModal({ type: "relationship-edit", relationship });
+  };
+
+  const closeModal = () => {
+    setModal({ type: "none" });
+    setImportMessage("");
+    setPersonError("");
+    setRelationshipError("");
+  };
+
+  const submitPerson = () => {
+    const trimmedName = personDraft.name.trim();
+    if (!trimmedName) {
+      setPersonError("Name is required.");
+      return;
+    }
+
+    const payload: PersonInput = {
+      name: trimmedName,
+      notes: personDraft.notes.trim() || undefined,
+      color: personDraft.color || undefined,
+    };
+
+    if (modal.type === "person-edit") {
+      updatePerson(modal.person.id, payload);
+    } else {
+      addPerson(payload);
+    }
+    closeModal();
+  };
+
+  const submitRelationship = () => {
+    const resolvedType =
+      relationshipDraft.typeChoice === "__custom__"
+        ? relationshipDraft.customType.trim()
+        : relationshipDraft.typeChoice.trim();
+
+    if (!relationshipDraft.source || !relationshipDraft.target) {
+      setRelationshipError("Choose both source and target.");
+      return;
+    }
+    if (relationshipDraft.source === relationshipDraft.target) {
+      setRelationshipError("Source and target must be different.");
+      return;
+    }
+    if (!resolvedType) {
+      setRelationshipError("Relationship type is required.");
+      return;
+    }
+
+    const payload: RelationshipInput = {
+      source: relationshipDraft.source,
+      target: relationshipDraft.target,
+      category: relationshipDraft.category,
+      type: resolvedType,
+      direction: relationshipDraft.direction,
+      color: relationshipDraft.color || undefined,
+      notes: relationshipDraft.notes.trim() || undefined,
+    };
+
+    if (modal.type === "relationship-edit") {
+      updateRelationship(modal.relationship.id, payload);
+    } else {
+      addRelationship(payload);
+    }
+    closeModal();
+  };
+
+  const exportJson = () => {
+    const graph: GraphData = { people, relationships };
+    downloadTextFile("relationflow-graph.json", JSON.stringify(graph, null, 2), "application/json");
+  };
+
+  const exportPeopleCsv = () => {
+    const csv = buildCsvRows(
+      ["id", "name", "notes", "color", "createdAt", "updatedAt"],
+      people.map((p) => [
+        p.id,
+        p.name,
+        p.notes ?? "",
+        p.color ?? "",
+        p.createdAt,
+        p.updatedAt,
+      ]),
+    );
+    downloadTextFile("relationflow-people.csv", csv, "text/csv");
+  };
+
+  const exportRelationshipsCsv = () => {
+    const csv = buildCsvRows(
+      [
+        "id",
+        "source",
+        "target",
+        "category",
+        "type",
+        "direction",
+        "color",
+        "notes",
+        "createdAt",
+        "updatedAt",
+      ],
+      relationships.map((r) => [
+        r.id,
+        r.source,
+        r.target,
+        r.category,
+        r.type,
+        r.direction,
+        r.color ?? "",
+        r.notes ?? "",
+        r.createdAt,
+        r.updatedAt,
+      ]),
+    );
+    downloadTextFile("relationflow-relationships.csv", csv, "text/csv");
+  };
+
+  const importJsonFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as GraphData;
+      if (!Array.isArray(parsed.people) || !Array.isArray(parsed.relationships)) {
+        setImportMessage("Invalid JSON shape. Expected { people, relationships }.");
+        return;
+      }
+      replaceGraph(parsed);
+      clearSelection();
+      setImportMessage("JSON import completed.");
+    } catch {
+      setImportMessage("Could not parse JSON file.");
+    }
+  };
+
+  const importCsvFiles = async (peopleFile?: File, relationshipsFile?: File) => {
+    if (!peopleFile && !relationshipsFile) {
+      setImportMessage("Choose at least one CSV file.");
+      return;
+    }
+
+    try {
+      const nextPeople = peopleFile
+        ? parsePeopleCsv(await peopleFile.text())
+        : [];
+      const nextRelationships = relationshipsFile
+        ? parseRelationshipsCsv(await relationshipsFile.text())
+        : [];
+
+      replaceGraph({ people: nextPeople, relationships: nextRelationships });
+      clearSelection();
+      setImportMessage("CSV import completed.");
+    } catch {
+      setImportMessage("Could not parse CSV files.");
+    }
+  };
+
+  return (
+    <>
+      <div className="pointer-events-none absolute right-4 top-4 z-20">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-line bg-panel/95 p-2 shadow-lg backdrop-blur">
+          <button
+            type="button"
+            onClick={openPersonCreate}
+            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white"
+          >
+            + Person
+          </button>
+          <button
+            type="button"
+            onClick={openRelationshipCreate}
+            className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+          >
+            + Relationship
+          </button>
+          <button
+            type="button"
+            onClick={() => setModal({ type: "import-export" })}
+            className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+          >
+            Import / Export
+          </button>
+        </div>
+      </div>
+
+      {(selectedPerson || selectedRelationship) && (
+        <div className="pointer-events-none absolute right-0 top-0 z-30 h-full w-[360px] max-w-[92vw]">
+          <div className="pointer-events-auto h-full border-l border-line bg-panel p-4 shadow-xl">
+            {selectedPerson && (
+              <div>
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-display text-lg text-ink">Person details</h3>
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+                  >
+                    x
+                  </button>
+                </div>
+                <div className="mb-2 text-sm text-muted">Name</div>
+                <div className="mb-3 text-base text-ink">{selectedPerson.name}</div>
+                <div className="mb-2 text-sm text-muted">Notes</div>
+                <div className="mb-4 rounded border border-line bg-canvas p-2 text-sm text-ink">
+                  {selectedPerson.notes || "No notes"}
+                </div>
+                <div className="mb-4 flex items-center gap-2">
+                  <span className="text-sm text-muted">Color</span>
+                  <span
+                    className="inline-block h-4 w-4 rounded-full border border-line"
+                    style={{ backgroundColor: selectedPerson.color || "#1a1d24" }}
+                  />
+                </div>
+
+                <div className="mb-2 text-sm text-muted">
+                  Relationships ({relatedToSelectedPerson.length})
+                </div>
+                <ul className="mb-4 max-h-52 space-y-1 overflow-auto rounded border border-line bg-canvas p-2">
+                  {relatedToSelectedPerson.map((rel) => {
+                    const otherId = rel.source === selectedPerson.id ? rel.target : rel.source;
+                    const otherName = peopleById.get(otherId)?.name ?? "Unknown";
+                    return (
+                      <li key={rel.id}>
+                        <button
+                          type="button"
+                          onClick={() => selectRelationship(rel.id)}
+                          className="w-full rounded px-2 py-1 text-left text-xs text-ink hover:bg-panel"
+                        >
+                          {rel.type} · {otherName}
+                        </button>
+                      </li>
+                    );
+                  })}
+                  {relatedToSelectedPerson.length === 0 && (
+                    <li className="px-2 py-1 text-xs text-muted">No relationships</li>
+                  )}
+                </ul>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openPersonEdit(selectedPerson)}
+                    className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Delete this person and all connected relationships?")) {
+                        deletePerson(selectedPerson.id);
+                      }
+                    }}
+                    className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {selectedRelationship && (
+              <div>
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-display text-lg text-ink">Relationship details</h3>
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+                  >
+                    x
+                  </button>
+                </div>
+                <dl className="space-y-2 text-sm text-ink">
+                  <div>
+                    <dt className="text-muted">Source</dt>
+                    <dd>{peopleById.get(selectedRelationship.source)?.name ?? "Unknown"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Target</dt>
+                    <dd>{peopleById.get(selectedRelationship.target)?.name ?? "Unknown"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Category</dt>
+                    <dd>{categoryLabels[selectedRelationship.category]}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Type</dt>
+                    <dd>{selectedRelationship.type}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Direction</dt>
+                    <dd>{selectedRelationship.direction}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Notes</dt>
+                    <dd>{selectedRelationship.notes || "No notes"}</dd>
+                  </div>
+                </dl>
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openRelationshipEdit(selectedRelationship)}
+                    className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Delete this relationship?")) {
+                        deleteRelationship(selectedRelationship.id);
+                      }
+                    }}
+                    className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {(modal.type === "person-create" || modal.type === "person-edit") && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-[520px] max-w-full rounded-xl border border-line bg-panel p-4 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-display text-lg text-ink">
+                {modal.type === "person-edit" ? "Edit person" : "Add person"}
+              </h3>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+              >
+                x
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-sm text-ink">
+                Name
+                <input
+                  value={personDraft.name}
+                  onChange={(e) => setPersonDraft((d) => ({ ...d, name: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block text-sm text-ink">
+                Notes
+                <textarea
+                  value={personDraft.notes}
+                  onChange={(e) => setPersonDraft((d) => ({ ...d, notes: e.target.value }))}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                />
+              </label>
+
+              <div>
+                <div className="mb-1 text-sm text-ink">Color</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {PERSON_COLORS.map((color) => {
+                    const active = (color || "") === personDraft.color;
+                    return (
+                      <button
+                        key={color || "none"}
+                        type="button"
+                        onClick={() => setPersonDraft((d) => ({ ...d, color }))}
+                        className={`h-7 w-7 rounded-full border ${active ? "border-accent ring-2 ring-accent/30" : "border-line"}`}
+                        style={{ backgroundColor: color || "transparent" }}
+                        title={color || "None"}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {personError && <p className="mt-3 text-sm text-red-600">{personError}</p>}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitPerson}
+                className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(modal.type === "relationship-create" || modal.type === "relationship-edit") && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-[580px] max-w-full rounded-xl border border-line bg-panel p-4 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-display text-lg text-ink">
+                {modal.type === "relationship-edit" ? "Edit relationship" : "Add relationship"}
+              </h3>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+              >
+                x
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-sm text-ink">
+                Source
+                <select
+                  value={relationshipDraft.source}
+                  onChange={(e) => setRelationshipDraft((d) => ({ ...d, source: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                >
+                  <option value="">Select person</option>
+                  {people.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-sm text-ink">
+                Target
+                <select
+                  value={relationshipDraft.target}
+                  onChange={(e) => setRelationshipDraft((d) => ({ ...d, target: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                >
+                  <option value="">Select person</option>
+                  {people.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-sm text-ink">
+                Category
+                <select
+                  value={relationshipDraft.category}
+                  onChange={(e) => {
+                    const category = e.target.value as RelationshipCategory;
+                    const firstType = RELATIONSHIP_CATALOG[category][0] ?? "";
+                    setRelationshipDraft((d) => ({
+                      ...d,
+                      category,
+                      typeChoice: firstType,
+                      customType: "",
+                    }));
+                  }}
+                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                >
+                  {CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {categoryLabels[category]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-sm text-ink">
+                Type
+                <select
+                  value={relationshipDraft.typeChoice}
+                  onChange={(e) =>
+                    setRelationshipDraft((d) => ({ ...d, typeChoice: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                >
+                  {relationshipCatalog[relationshipDraft.category].map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                  <option value="__custom__">Custom...</option>
+                </select>
+              </label>
+
+              {relationshipDraft.typeChoice === "__custom__" && (
+                <label className="sm:col-span-2 text-sm text-ink">
+                  Custom type
+                  <input
+                    value={relationshipDraft.customType}
+                    onChange={(e) =>
+                      setRelationshipDraft((d) => ({ ...d, customType: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                  />
+                </label>
+              )}
+
+              <div className="text-sm text-ink">
+                Direction
+                <div className="mt-1 flex items-center gap-2 rounded-lg border border-line bg-canvas p-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRelationshipDraft((d) => ({ ...d, direction: "two-way" }))
+                    }
+                    className={`rounded px-3 py-1 text-xs ${
+                      relationshipDraft.direction === "two-way"
+                        ? "bg-accent text-white"
+                        : "text-ink"
+                    }`}
+                  >
+                    two-way
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRelationshipDraft((d) => ({ ...d, direction: "one-way" }))
+                    }
+                    className={`rounded px-3 py-1 text-xs ${
+                      relationshipDraft.direction === "one-way"
+                        ? "bg-accent text-white"
+                        : "text-ink"
+                    }`}
+                  >
+                    one-way
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-sm text-ink">
+                Color override
+                <div className="mt-1 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRelationshipDraft((d) => ({ ...d, color: "" }))}
+                    className={`rounded border px-2 py-1 text-xs ${
+                      relationshipDraft.color ? "border-line" : "border-accent text-accent"
+                    }`}
+                  >
+                    Default
+                  </button>
+                  <input
+                    type="color"
+                    value={relationshipDraft.color || relationshipColors[relationshipDraft.category]}
+                    onChange={(e) =>
+                      setRelationshipDraft((d) => ({ ...d, color: e.target.value }))
+                    }
+                    className="h-9 w-12 rounded border border-line bg-canvas"
+                  />
+                </div>
+              </div>
+
+              <label className="sm:col-span-2 text-sm text-ink">
+                Notes
+                <textarea
+                  value={relationshipDraft.notes}
+                  onChange={(e) => setRelationshipDraft((d) => ({ ...d, notes: e.target.value }))}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+
+            {relationshipError && <p className="mt-3 text-sm text-red-600">{relationshipError}</p>}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitRelationship}
+                className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal.type === "import-export" && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-[720px] max-w-full rounded-xl border border-line bg-panel p-4 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-display text-lg text-ink">Import / Export</h3>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+              >
+                x
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <section className="rounded-lg border border-line bg-canvas p-3">
+                <h4 className="mb-2 text-sm font-semibold text-ink">JSON</h4>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={exportJson}
+                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                  >
+                    Export JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => jsonInputRef.current?.click()}
+                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                  >
+                    Import JSON
+                  </button>
+                  <input
+                    ref={jsonInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void importJsonFile(file);
+                    }}
+                  />
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-line bg-canvas p-3">
+                <h4 className="mb-2 text-sm font-semibold text-ink">CSV</h4>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={exportPeopleCsv}
+                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                  >
+                    Export people.csv
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportRelationshipsCsv}
+                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                  >
+                    Export relationships.csv
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => csvPeopleInputRef.current?.click()}
+                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                  >
+                    Pick people.csv
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => csvRelationshipsInputRef.current?.click()}
+                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                  >
+                    Pick relationships.csv
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void importCsvFiles(
+                        csvPeopleInputRef.current?.files?.[0],
+                        csvRelationshipsInputRef.current?.files?.[0],
+                      )
+                    }
+                    className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white"
+                  >
+                    Import CSV
+                  </button>
+                </div>
+                <input
+                  ref={csvPeopleInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                />
+                <input
+                  ref={csvRelationshipsInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                />
+              </section>
+            </div>
+
+            {importMessage && <p className="mt-3 text-sm text-muted">{importMessage}</p>}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function parsePeopleCsv(content: string): Person[] {
+  const rows = parseCsv(content);
+  if (rows.length <= 1) return [];
+  const header = rows[0].map((h) => h.trim());
+  const idx = indexByHeader(header);
+  return rows.slice(1).map((row) => {
+    const get = (name: string) => row[idx[name] ?? -1] ?? "";
+    return {
+      id: get("id"),
+      name: get("name"),
+      notes: get("notes") || undefined,
+      color: get("color") || undefined,
+      createdAt: get("createdAt") || new Date().toISOString(),
+      updatedAt: get("updatedAt") || new Date().toISOString(),
+    };
+  });
+}
+
+function parseRelationshipsCsv(content: string): Relationship[] {
+  const rows = parseCsv(content);
+  if (rows.length <= 1) return [];
+  const header = rows[0].map((h) => h.trim());
+  const idx = indexByHeader(header);
+  return rows.slice(1).map((row) => {
+    const get = (name: string) => row[idx[name] ?? -1] ?? "";
+    const category = get("category") as RelationshipCategory;
+    const direction = get("direction") as RelationshipDirection;
+    return {
+      id: get("id"),
+      source: get("source"),
+      target: get("target"),
+      category: CATEGORIES.includes(category) ? category : "other",
+      type: get("type"),
+      direction: direction === "one-way" ? "one-way" : "two-way",
+      color: get("color") || undefined,
+      notes: get("notes") || undefined,
+      createdAt: get("createdAt") || new Date().toISOString(),
+      updatedAt: get("updatedAt") || new Date().toISOString(),
+    };
+  });
+}
+
+function indexByHeader(header: string[]): Record<string, number> {
+  const index: Record<string, number> = {};
+  header.forEach((name, i) => {
+    index[name] = i;
+  });
+  return index;
 }

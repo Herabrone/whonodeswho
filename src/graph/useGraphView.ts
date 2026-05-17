@@ -9,7 +9,7 @@
 import { useMemo } from "react";
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
 import type { Person } from "../types";
-import { CATEGORY_COLORS, WEAK_RELATIONSHIP_TYPES, relationshipColor } from "../constants";
+import { WEAK_RELATIONSHIP_TYPES } from "../constants";
 import { useGraphStore } from "../store/useGraphStore";
 import { autoLayout, buildAdjacency, getNodesWithinDegrees } from "../lib/graph";
 
@@ -42,6 +42,7 @@ export function useGraphView(): GraphView {
   const focusPersonId = useGraphStore((s) => s.focusPersonId);
   const focusDegrees = useGraphStore((s) => s.focusDegrees);
   const pathPersonIds = useGraphStore((s) => s.pathPersonIds);
+  const relationshipColors = useGraphStore((s) => s.relationshipColors);
 
   return useMemo<GraphView>(() => {
     const graph = { people, relationships };
@@ -105,7 +106,7 @@ export function useGraphView(): GraphView {
           (focusSet !== null &&
             !(focusSet.has(r.source) && focusSet.has(r.target))) ||
           (pathPersonIds.length > 0 && !onPath);
-        const color = relationshipColor(r.category, r.color);
+        const color = r.color ?? relationshipColors[r.category];
         return {
           id: r.id,
           source: r.source,
@@ -147,8 +148,6 @@ export function useGraphView(): GraphView {
     focusPersonId,
     focusDegrees,
     pathPersonIds,
+    relationshipColors,
   ]);
 }
-
-/** Re-exported for nodes that want category color directly. */
-export { CATEGORY_COLORS };
