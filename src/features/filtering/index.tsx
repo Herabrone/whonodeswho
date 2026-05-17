@@ -7,6 +7,7 @@ import { useGraphStore } from "../../store/useGraphStore";
 
 export function FilteringFeature() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
 
   const people = useGraphStore((s) => s.people);
   const visibleCategories = useGraphStore((s) => s.visibleCategories);
@@ -28,7 +29,7 @@ export function FilteringFeature() {
   const matches = useMemo(
     () =>
       trimmedQuery.length === 0
-        ? []
+        ? people
         : people.filter((p) => p.name.toLowerCase().includes(trimmedQuery)),
     [people, trimmedQuery],
   );
@@ -44,19 +45,28 @@ export function FilteringFeature() {
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearchFocused(false);
+                  }
+                }}
                 placeholder="Search people..."
                 className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink outline-none ring-0 placeholder:text-muted focus:border-accent"
               />
-              {searchQuery && (
+              {(searchQuery || searchFocused) && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSearchFocused(false);
+                  }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-1 text-xs text-muted hover:bg-panel"
                 >
-                  x
+                  Clear
                 </button>
               )}
-              {searchQuery && (
+              {searchFocused && (
                 <div className="absolute left-0 top-[calc(100%+0.4rem)] w-full overflow-hidden rounded-lg border border-line bg-panel shadow-xl">
                   {matches.length > 0 ? (
                     <ul className="max-h-56 overflow-auto py-1">
@@ -65,8 +75,9 @@ export function FilteringFeature() {
                           <button
                             type="button"
                             onClick={() => {
+                              setSearchQuery(person.name);
                               selectPerson(person.id);
-                              setSearchQuery("");
+                              setSearchFocused(false);
                             }}
                             className="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-canvas"
                           >

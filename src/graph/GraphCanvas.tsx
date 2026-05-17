@@ -36,7 +36,6 @@ export function GraphCanvas() {
   const selectPerson = useGraphStore((s) => s.selectPerson);
   const selectRelationship = useGraphStore((s) => s.selectRelationship);
   const clearSelection = useGraphStore((s) => s.clearSelection);
-  const setFocus = useGraphStore((s) => s.setFocus);
   const layoutMode = useGraphStore((s) => s.layoutMode);
   const treeShape = useGraphStore((s) => s.treeShape);
   const treeRootId = useGraphStore((s) => s.treeRootId);
@@ -64,26 +63,27 @@ export function GraphCanvas() {
       if (!personId) return;
 
       selectPerson(personId);
+    },
+    [selectPerson],
+  );
+
+  const onNodeDoubleClick = useCallback<NodeMouseHandler>(
+    (event, node) => {
+      const personId =
+        typeof node.data === "object" && node.data !== null
+          ? (node.data as { person?: { id?: string } }).person?.id
+          : undefined;
+      if (!personId) return;
       if (layoutMode === "tree") {
+        event.preventDefault();
+        event.stopPropagation();
         setTreeRoot(personId);
         requestAnimationFrame(() => {
           void fitView({ padding: 0.25, duration: 220 });
         });
       }
     },
-    [fitView, layoutMode, selectPerson, setTreeRoot],
-  );
-
-  const onNodeDoubleClick = useCallback<NodeMouseHandler>(
-    (_, node) => {
-      const personId =
-        typeof node.data === "object" && node.data !== null
-          ? (node.data as { person?: { id?: string } }).person?.id
-          : undefined;
-      if (!personId) return;
-      setFocus(personId);
-    },
-    [setFocus],
+    [fitView, layoutMode, setTreeRoot],
   );
 
   const onEdgeClick = useCallback<EdgeMouseHandler<Edge>>(
@@ -122,6 +122,7 @@ export function GraphCanvas() {
       onConnect={onConnect}
       onPaneClick={clearSelection}
       nodesDraggable={layoutMode === "free"}
+      zoomOnDoubleClick={layoutMode !== "tree"}
       fitView
       fitViewOptions={{ padding: 0.3 }}
       proOptions={{ hideAttribution: true }}
@@ -139,7 +140,7 @@ export function GraphCanvas() {
               transform: `translate(${groupedDivider.x}px, ${groupedDivider.yTop}px)`,
               width: 0,
               height: groupedDivider.yBottom - groupedDivider.yTop,
-              borderLeft: "2px dashed rgba(134, 142, 150, 0.65)",
+              borderLeft: "2px solid rgba(134, 142, 150, 0.65)",
               pointerEvents: "none",
             }}
           />

@@ -329,7 +329,6 @@ export function useGraphView(): GraphView {
             stroke: color,
             strokeWidth,
             opacity,
-            strokeDasharray: secondary && !onPath ? "6 4" : undefined,
           },
           labelStyle: {
             fill: "#1a1d24",

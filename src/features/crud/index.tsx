@@ -56,6 +56,14 @@ const PERSON_COLORS = [
   "#7b2cbf",
 ];
 
+function capitalizeWords(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function initialPersonDraft(person?: Person): PersonDraft {
   return {
     name: person?.name ?? "",
@@ -467,7 +475,7 @@ export function CrudFeature() {
                           onClick={() => selectRelationship(rel.id)}
                           className="w-full rounded text-left hover:bg-panel"
                         >
-                          <div className="text-sm text-ink">{rel.type} · {otherName}</div>
+                          <div className="text-sm text-ink">{capitalizeWords(rel.type)} · {otherName}</div>
                           <div className="mt-1 text-xs text-muted">
                             {categoryLabels[rel.category]} · {rel.direction}
                           </div>
@@ -563,7 +571,7 @@ export function CrudFeature() {
                   </div>
                   <div>
                     <dt className="text-muted">Type</dt>
-                    <dd>{selectedRelationship.type}</dd>
+                    <dd>{capitalizeWords(selectedRelationship.type)}</dd>
                   </div>
                   <div>
                     <dt className="text-muted">Direction</dt>
@@ -763,7 +771,7 @@ export function CrudFeature() {
                 >
                   {relationshipCatalog[relationshipDraft.category].map((type) => (
                     <option key={type} value={type}>
-                      {type}
+                      {capitalizeWords(type)}
                     </option>
                   ))}
                   <option value="__custom__">Custom...</option>

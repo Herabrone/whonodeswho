@@ -102,7 +102,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
         {canvas}
         {layoutMode === "tree" && treeRootId === null ? (
           <div className="pointer-events-none absolute left-1/2 top-5 z-40 -translate-x-1/2 rounded-full border border-line bg-panel/95 px-4 py-1.5 text-xs font-medium text-muted shadow-panel">
-            Click a person to grow the tree.
+            Double-click a person to grow the tree.
           </div>
         ) : null}
         {overlays}
