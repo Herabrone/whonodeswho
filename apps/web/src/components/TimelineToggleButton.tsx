@@ -11,8 +11,8 @@ export function TimelineToggleButton() {
       onClick={() => (timelineOpen ? closeTimeline() : openTimeline())}
       className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
         timelineOpen
-          ? "border-ink bg-ink text-canvas"
-          : "border-line bg-canvas text-muted hover:text-ink"
+          ? "border-rf-text bg-rf-text text-rf-base"
+          : "border-rf-border bg-rf-base text-rf-muted hover:text-rf-text"
       }`}
     >
       {timelineOpen ? "⏹ Timeline" : "⏱ Timeline"}

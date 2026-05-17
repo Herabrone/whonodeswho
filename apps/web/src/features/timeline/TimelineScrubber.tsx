@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CATEGORY_COLORS } from "../../constants";
+import { CATEGORY_UI_COLORS } from "../../constants";
 import { useGraphStore } from "../../store/useGraphStore";
 
 interface TimelineScrubberProps {
@@ -30,7 +30,7 @@ export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
       <button
         type="button"
         onClick={() => setTimelinePlaying(!timelinePlaying)}
-        className="rounded-full border border-line bg-canvas px-2.5 py-1 text-sm text-ink hover:bg-panel"
+        className="rounded-full border border-rf-border bg-rf-subtle px-2.5 py-1 text-sm text-rf-text hover:bg-rf-base"
       >
         {timelinePlaying ? "Pause" : "Play"}
       </button>
@@ -44,7 +44,7 @@ export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
           value={timelineYear}
           onChange={(event) => setTimelineYear(Number(event.target.value))}
           className="w-full"
-          style={{ accentColor: "#7c3aed" }}
+          style={{ accentColor: "var(--rf-accent)" }}
         />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-3">
           {events.map((relationship) => {
@@ -64,8 +64,8 @@ export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
                   height: 8,
                   transform: "translate(-50%, 0)",
                   borderRadius: "999px",
-                  backgroundColor: CATEGORY_COLORS[relationship.category],
-                  boxShadow: "0 0 0 2px rgba(255,255,255,0.9)",
+                  backgroundColor: CATEGORY_UI_COLORS[relationship.category],
+                  boxShadow: "0 0 0 2px var(--rf-bg-surface)",
                 }}
               />
             );
@@ -73,18 +73,18 @@ export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
         </div>
       </div>
 
-      <span className="w-14 text-center font-mono text-sm text-ink">
+      <span className="w-14 text-center font-mono text-sm text-rf-text">
         {Math.floor(timelineYear)}
       </span>
 
-      <div className="flex items-center rounded-full border border-line bg-canvas p-0.5 text-xs">
+      <div className="flex items-center rounded-full border border-rf-border bg-rf-subtle p-0.5 text-xs">
         {[1, 2, 3].map((speed) => (
           <button
             key={speed}
             type="button"
             onClick={() => setTimelineSpeed(speed as 1 | 2 | 3)}
             className={`rounded-full px-2 py-1 ${
-              timelineSpeed === speed ? "bg-accent text-white" : "text-ink hover:bg-panel"
+              timelineSpeed === speed ? "bg-rf-accent text-white" : "text-rf-text hover:bg-rf-base"
             }`}
           >
             {speed}x
@@ -95,7 +95,7 @@ export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
       <button
         type="button"
         onClick={closeTimeline}
-        className="rounded-full border border-line bg-canvas px-2.5 py-1 text-sm text-muted hover:text-ink"
+        className="rounded-full border border-rf-border bg-rf-subtle px-2.5 py-1 text-sm text-rf-muted hover:text-rf-text"
       >
         x
       </button>

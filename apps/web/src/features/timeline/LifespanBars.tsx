@@ -1,4 +1,4 @@
-import { CATEGORY_COLORS } from "../../constants";
+import { CATEGORY_UI_COLORS } from "../../constants";
 import type { Person, Relationship } from "../../types";
 
 interface LifespanBarsProps {
@@ -43,7 +43,7 @@ export function LifespanBars({
               bottom: 18,
               left: toPercent(currentYear, minYear, maxYear),
               width: 2,
-              background: "#7c3aed",
+              background: "var(--rf-accent)",
               pointerEvents: "none",
             }}
           />
@@ -58,10 +58,10 @@ export function LifespanBars({
               const ended = relationship.isActive === false;
               return (
                 <div key={relationship.id} className="grid grid-cols-[60px_1fr] items-center gap-3">
-                  <div className="truncate text-right text-[11px] text-muted">
+                  <div className="truncate text-right text-[11px] text-rf-muted">
                     {personName.split(" ")[0]}
                   </div>
-                  <div className="relative h-[10px] rounded-full bg-canvas/80">
+                  <div className="relative h-[10px] rounded-full bg-rf-subtle">
                     <div
                       style={{
                         position: "absolute",
@@ -71,7 +71,7 @@ export function LifespanBars({
                         width: `calc(${toPercent(endYear, minYear, maxYear)} - ${toPercent(startYear, minYear, maxYear)})`,
                         minWidth: 6,
                         borderRadius: 999,
-                        backgroundColor: CATEGORY_COLORS[relationship.category],
+                        backgroundColor: CATEGORY_UI_COLORS[relationship.category],
                         opacity: ended ? 0.3 : 1,
                         backgroundImage: ended
                           ? "repeating-linear-gradient(135deg, rgba(255,255,255,0.35) 0 6px, rgba(255,255,255,0) 6px 12px)"
@@ -87,7 +87,7 @@ export function LifespanBars({
                         width: 8,
                         height: 8,
                         borderRadius: "999px",
-                        backgroundColor: CATEGORY_COLORS[relationship.category],
+                        backgroundColor: CATEGORY_UI_COLORS[relationship.category],
                         animation: "timeline-pulse 1s ease forwards",
                         transform: "translate(-50%, -50%)",
                       }}
@@ -110,8 +110,8 @@ export function LifespanBars({
               textAlign: "center",
             }}
           >
-            <div className="mx-auto h-2 w-px bg-line" />
-            <div className="mt-1 text-[10px] text-muted">{year}</div>
+            <div className="mx-auto h-2 w-px bg-rf-border" />
+            <div className="mt-1 text-[10px] text-rf-muted">{year}</div>
           </div>
         ))}
       </div>

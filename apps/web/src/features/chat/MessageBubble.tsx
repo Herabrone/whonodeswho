@@ -12,12 +12,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       <div
         className={`max-w-[82%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed shadow-sm ${
           isUser
-            ? "bg-accent text-white"
-            : "border border-line bg-canvas text-ink"
+            ? "bg-rf-accent text-white"
+            : "border border-rf-border bg-rf-subtle text-rf-text"
         }`}
       >
         {message.content}
-        {message.streaming ? <span className="ml-0.5 text-muted">|</span> : null}
+        {message.streaming ? (
+          <span className={`ml-0.5 ${isUser ? "text-white/75" : "text-rf-muted"}`}>|</span>
+        ) : null}
       </div>
     </div>
   );

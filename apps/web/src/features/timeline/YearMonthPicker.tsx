@@ -31,7 +31,7 @@ export function YearMonthPicker({
 
   return (
     <>
-      <label className="text-sm text-ink">
+      <label className="text-sm text-rf-text">
         Year started
         <select
           value={startYear ?? ""}
@@ -40,7 +40,7 @@ export function YearMonthPicker({
             onYearChange(value ? Number(value) : undefined);
             if (!value) onMonthChange(undefined);
           }}
-          className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
         >
           <option value="">Optional</option>
           {years.map((year) => (
@@ -51,8 +51,8 @@ export function YearMonthPicker({
         </select>
       </label>
 
-      <label className="text-sm text-ink">
-        Month {startYear ? <span className="text-muted">(optional - anniversary reminders)</span> : null}
+      <label className="text-sm text-rf-text">
+        Month {startYear ? <span className="text-rf-muted">(optional - anniversary reminders)</span> : null}
         <select
           value={startMonth ?? ""}
           onChange={(event) => {
@@ -60,7 +60,7 @@ export function YearMonthPicker({
             onMonthChange(value ? Number(value) : undefined);
           }}
           disabled={!startYear}
-          className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text disabled:cursor-not-allowed disabled:opacity-50"
         >
           <option value="">Optional</option>
           {MONTHS.map((month, index) => (

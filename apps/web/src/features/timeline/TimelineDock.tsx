@@ -26,9 +26,9 @@ export function TimelineDock() {
         left: 0,
         right: 0,
         zIndex: 25,
-        background: "var(--color-background-panel, white)",
-        borderTop: "1px solid var(--color-border-tertiary, #d8d6cf)",
-        boxShadow: "0 -4px 20px rgba(0,0,0,0.08)",
+        background: "var(--rf-bg-surface)",
+        borderTop: "1px solid var(--rf-border-default)",
+        boxShadow: "var(--rf-shadow-top-dock)",
         padding: "12px 16px",
         transform: timelineOpen ? "translateY(0)" : "translateY(100%)",
         transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -36,7 +36,7 @@ export function TimelineDock() {
     >
       <TimelineScrubber minYear={range.min} maxYear={range.max + 1} />
       {datedRelationships.length < 2 ? (
-        <div className="mt-4 text-sm text-muted">
+        <div className="mt-4 text-sm text-rf-muted">
           Add a “Year started” to your relationships to enable the timeline.
         </div>
       ) : (

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { graphTokens } from "@/design-tokens";
 import { ChatPanel } from "./ChatPanel";
 import { useChatStream } from "./useChatStream";
 
@@ -24,7 +25,12 @@ export function ChatFeature() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="pointer-events-auto absolute bottom-4 right-4 z-[46] rounded-full border border-line bg-ink px-4 py-2 text-sm font-semibold text-canvas shadow-panel transition-colors hover:bg-accent"
+        className="pointer-events-auto absolute bottom-4 right-4 z-[46] rounded-full border px-4 py-2 text-sm font-semibold shadow-panel transition-opacity hover:opacity-90"
+        style={{
+          borderColor: graphTokens.control.border,
+          backgroundColor: graphTokens.node.bgDefault,
+          color: graphTokens.node.textPrimary,
+        }}
       >
         {open ? "Hide chat" : "Chat"}
       </button>
