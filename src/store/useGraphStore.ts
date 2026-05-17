@@ -15,11 +15,13 @@ import { create } from "zustand";
 import type {
   FocusDegrees,
   GraphData,
+  LayoutMode,
   Person,
   PersonInput,
   Relationship,
   RelationshipCategory,
   RelationshipInput,
+  TreeShape,
   XYPosition,
 } from "../types";
 import {
@@ -67,6 +69,12 @@ interface FocusSlice {
   pathPersonIds: string[];
 }
 
+interface LayoutSlice {
+  layoutMode: LayoutMode;
+  treeShape: TreeShape;
+  treeRootId: string | null;
+}
+
 interface Lifecycle {
   hydrated: boolean;
 }
@@ -76,6 +84,7 @@ export interface GraphStore
     SelectionSlice,
     ViewSlice,
     FocusSlice,
+    LayoutSlice,
     Lifecycle {
   // -- lifecycle --
   hydrate: () => Promise<void>;
@@ -110,6 +119,11 @@ export interface GraphStore
   setPath: (personIds: string[]) => void;
   clearPath: () => void;
 
+  // -- layout actions (Phase 0.1) --
+  setLayoutMode: (mode: LayoutMode) => void;
+  setTreeShape: (shape: TreeShape) => void;
+  setTreeRoot: (personId: string | null) => void;
+
   // -- legend actions (Contract Amendment) --
   updateCategoryLabel: (category: RelationshipCategory, label: string) => void;
   updateCategoryColor: (category: RelationshipCategory, color: string) => void;
@@ -129,6 +143,11 @@ function scheduleSave(get: () => GraphStore) {
     void persistenceStore.save({
       graph: { people: s.people, relationships: s.relationships },
       positions: s.positions,
+      layout: {
+        layoutMode: s.layoutMode,
+        treeShape: s.treeShape,
+        treeRootId: s.treeRootId,
+      },
     });
   }, 400);
 }
@@ -150,6 +169,12 @@ const LEGEND_DEFAULTS = {
   relationshipCatalog: { ...RELATIONSHIP_CATALOG },
 };
 
+const LAYOUT_DEFAULTS: LayoutSlice = {
+  layoutMode: "free",
+  treeShape: "radial",
+  treeRootId: null,
+};
+
 export const useGraphStore = create<GraphStore>((set, get) => ({
   // initial state
   people: [],
@@ -159,6 +184,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   selectedRelationshipId: null,
   ...VIEW_DEFAULTS,
   ...LEGEND_DEFAULTS,
+  ...LAYOUT_DEFAULTS,
   focusPersonId: null,
   focusDegrees: 1,
   pathPersonIds: [],
@@ -171,6 +197,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       people: persisted.graph.people,
       relationships: persisted.graph.relationships,
       positions: persisted.positions,
+      layoutMode: persisted.layout?.layoutMode ?? LAYOUT_DEFAULTS.layoutMode,
+      treeShape: persisted.layout?.treeShape ?? LAYOUT_DEFAULTS.treeShape,
+      treeRootId: persisted.layout?.treeRootId ?? LAYOUT_DEFAULTS.treeRootId,
       hydrated: true,
     });
   },
@@ -212,6 +241,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
           s.selectedPersonId === id ? null : s.selectedPersonId,
         focusPersonId: s.focusPersonId === id ? null : s.focusPersonId,
         pathPersonIds: s.pathPersonIds.includes(id) ? [] : s.pathPersonIds,
+        treeRootId: s.treeRootId === id ? null : s.treeRootId,
       };
     });
     scheduleSave(get);
@@ -256,6 +286,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedRelationshipId: null,
       focusPersonId: null,
       pathPersonIds: [],
+      treeRootId: null,
     });
     scheduleSave(get);
   },
@@ -298,6 +329,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   clearFocus: () => set({ focusPersonId: null }),
   setPath: (personIds) => set({ pathPersonIds: personIds }),
   clearPath: () => set({ pathPersonIds: [] }),
+
+  // -- layout actions --
+  setLayoutMode: (mode) => {
+    set({ layoutMode: mode });
+    scheduleSave(get);
+  },
+  setTreeShape: (shape) => {
+    set({ treeShape: shape });
+    scheduleSave(get);
+  },
+  setTreeRoot: (personId) => {
+    set({ treeRootId: personId });
+    scheduleSave(get);
+  },
 
   // -- legend actions --
   updateCategoryLabel: (category, label) => {

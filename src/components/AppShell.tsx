@@ -6,6 +6,7 @@
  */
 import type { ReactNode } from "react";
 import { Legend } from "./Legend";
+import { useGraphStore } from "../store/useGraphStore";
 
 interface AppShellProps {
   /** The graph canvas. */
@@ -15,6 +16,12 @@ interface AppShellProps {
 }
 
 export function AppShell({ canvas, overlays }: AppShellProps) {
+  const layoutMode = useGraphStore((s) => s.layoutMode);
+  const treeShape = useGraphStore((s) => s.treeShape);
+  const treeRootId = useGraphStore((s) => s.treeRootId);
+  const setLayoutMode = useGraphStore((s) => s.setLayoutMode);
+  const setTreeShape = useGraphStore((s) => s.setTreeShape);
+
   return (
     <div className="flex h-screen w-screen flex-col bg-canvas">
       <header className="flex items-center justify-between border-b border-line bg-panel px-5 py-3">
@@ -26,12 +33,61 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
           </h1>
           <span className="text-xs text-muted">personal relationship map</span>
         </div>
-        <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
-          Phase 0 · foundation
-        </span>
+        <div className="flex items-center gap-3">
+          <div className="inline-flex rounded-full border border-line bg-canvas p-0.5 text-xs">
+            <button
+              type="button"
+              className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                layoutMode === "free" ? "bg-panel text-ink" : "text-muted"
+              }`}
+              onClick={() => setLayoutMode("free")}
+            >
+              Free
+            </button>
+            <button
+              type="button"
+              className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                layoutMode === "tree" ? "bg-panel text-ink" : "text-muted"
+              }`}
+              onClick={() => setLayoutMode("tree")}
+            >
+              Tree
+            </button>
+          </div>
+          {layoutMode === "tree" ? (
+            <div className="inline-flex rounded-full border border-line bg-canvas p-0.5 text-xs">
+              <button
+                type="button"
+                className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                  treeShape === "radial" ? "bg-panel text-ink" : "text-muted"
+                }`}
+                onClick={() => setTreeShape("radial")}
+              >
+                Radial
+              </button>
+              <button
+                type="button"
+                className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                  treeShape === "layered" ? "bg-panel text-ink" : "text-muted"
+                }`}
+                onClick={() => setTreeShape("layered")}
+              >
+                Layered
+              </button>
+            </div>
+          ) : null}
+          <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
+            Phase 0 · foundation
+          </span>
+        </div>
       </header>
       <main className="relative flex-1 overflow-hidden">
         {canvas}
+        {layoutMode === "tree" && treeRootId === null ? (
+          <div className="pointer-events-none absolute left-1/2 top-5 z-40 -translate-x-1/2 rounded-full border border-line bg-panel/95 px-4 py-1.5 text-xs font-medium text-muted shadow-panel">
+            Click a person to grow the tree.
+          </div>
+        ) : null}
         {overlays}
         <Legend />
       </main>

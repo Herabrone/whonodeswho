@@ -11,7 +11,6 @@ export function IntelligenceFeature() {
 
   const people = useGraphStore((s) => s.people);
   const relationships = useGraphStore((s) => s.relationships);
-  const selectedPersonId = useGraphStore((s) => s.selectedPersonId);
   const focusPersonId = useGraphStore((s) => s.focusPersonId);
   const focusDegrees = useGraphStore((s) => s.focusDegrees);
   const pathPersonIds = useGraphStore((s) => s.pathPersonIds);
@@ -126,17 +125,6 @@ export function IntelligenceFeature() {
                 </button>
               ))}
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedPersonId) setFocus(selectedPersonId, focusDegrees);
-              }}
-              disabled={!selectedPersonId}
-              className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Focus selected
-            </button>
 
             <button
               type="button"

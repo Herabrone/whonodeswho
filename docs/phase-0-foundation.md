@@ -83,7 +83,8 @@ const addPerson = useGraphStore((s) => s.addPerson);
 ### State
 `people`, `relationships`, `positions`, `selectedPersonId`,
 `selectedRelationshipId`, `visibleCategories`, `showLabels`, `hideWeak`,
-`searchQuery`, `focusPersonId`, `focusDegrees`, `pathPersonIds`, `hydrated`.
+`searchQuery`, `focusPersonId`, `focusDegrees`, `pathPersonIds`, `hydrated`,
+`layoutMode`, `treeShape`, `treeRootId`.
 
 ### Actions
 | Action | Signature | Notes |
@@ -110,8 +111,12 @@ const addPerson = useGraphStore((s) => s.addPerson);
 | `clearFocus` | `() => void` | |
 | `setPath` | `(personIds: string[]) => void` | degrees-of-separation result |
 | `clearPath` | `() => void` | |
+| `setLayoutMode` | `("free" \| "tree") => void` | layout mode toggle |
+| `setTreeShape` | `("radial" \| "layered") => void` | tree layout style |
+| `setTreeRoot` | `(personId: string \| null) => void` | active tree root |
 
 State auto-persists (debounced 400ms) after any data/position mutation.
+Layout preferences (`layoutMode`, `treeShape`, `treeRootId`) are also persisted.
 
 ### Selectors
 ```ts
@@ -132,6 +137,21 @@ findShortestPath(adj, startId, targetId): string[] | null // BFS, inclusive
 pathEdgeIds(graph, path): string[]                        // edges along a path
 autoLayout(index, total, center?): XYPosition             // circular layout
 ```
+
+## 5.1 Tree layout primitives — `src/graph/layout.ts`
+
+```ts
+type TreeShape = "radial" | "layered";
+computeTreeLayout(graph, rootId, shape): Record<string, XYPosition>
+buildTreeStructure(graph, rootId): TreeStructure
+isTreePrimaryEdge(structure, source, target): boolean
+computeRadialCategoryLabels(graph, rootId, positions, structure, colors)
+```
+
+Tree mode uses a BFS spanning tree from the selected root, sorts children by
+relationship category (`family`, `romantic`, `friend`, `work`, `other`) then
+name, and feeds the sorted hierarchy into `d3-hierarchy` for radial or layered
+coordinates. Disconnected people are parked below the tree instead of dropped.
 
 ## 6. Persistence / backend-swap — `src/store/persistence.ts`
 

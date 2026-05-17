@@ -4,12 +4,15 @@
  * the store (selection, drag position). It is a PURE FUNCTION OF STORE STATE —
  * no track should ever need to edit this file.
  */
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
+  ViewportPortal,
   ReactFlow,
   Background,
   Controls,
   MiniMap,
+  useReactFlow,
+  type Connection,
   type Edge,
   type NodeChange,
   type NodeMouseHandler,
@@ -19,15 +22,24 @@ import "@xyflow/react/dist/style.css";
 import { PersonNode } from "./PersonNode";
 import { useGraphView, type PersonNode as PersonNodeType } from "./useGraphView";
 import { useGraphStore } from "../store/useGraphStore";
+import { FloatingEdge } from "./FloatingEdge";
+import { dispatchOpenRelationshipComposer } from "../features/crud/relationshipComposerEvent";
 
 const nodeTypes = { person: PersonNode };
+const edgeTypes = { relationship: FloatingEdge };
 
 export function GraphCanvas() {
-  const { nodes, edges } = useGraphView();
+  const { nodes, edges, radialLabels } = useGraphView();
+  const { fitView } = useReactFlow();
   const setPosition = useGraphStore((s) => s.setPosition);
   const selectPerson = useGraphStore((s) => s.selectPerson);
   const selectRelationship = useGraphStore((s) => s.selectRelationship);
   const clearSelection = useGraphStore((s) => s.clearSelection);
+  const setFocus = useGraphStore((s) => s.setFocus);
+  const layoutMode = useGraphStore((s) => s.layoutMode);
+  const treeShape = useGraphStore((s) => s.treeShape);
+  const treeRootId = useGraphStore((s) => s.treeRootId);
+  const setTreeRoot = useGraphStore((s) => s.setTreeRoot);
 
   // Commit drag positions straight to the store; the derived nodes react.
   const onNodesChange = useCallback(
@@ -42,8 +54,18 @@ export function GraphCanvas() {
   );
 
   const onNodeClick = useCallback<NodeMouseHandler<PersonNodeType>>(
-    (_, node) => selectPerson(node.id),
-    [selectPerson],
+    (_, node) => {
+      selectPerson(node.id);
+      if (layoutMode === "tree") {
+        setTreeRoot(node.id);
+      }
+    },
+    [layoutMode, selectPerson, setTreeRoot],
+  );
+
+  const onNodeDoubleClick = useCallback<NodeMouseHandler<PersonNodeType>>(
+    (_, node) => setFocus(node.id),
+    [setFocus],
   );
 
   const onEdgeClick = useCallback<EdgeMouseHandler<Edge>>(
@@ -51,15 +73,37 @@ export function GraphCanvas() {
     [selectRelationship],
   );
 
+  const onConnect = useCallback((connection: Connection) => {
+    if (!connection.source || !connection.target) return;
+    if (connection.source === connection.target) return;
+
+    dispatchOpenRelationshipComposer({
+      sourceId: connection.source,
+      targetId: connection.target,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (layoutMode !== "tree") return;
+    const frame = requestAnimationFrame(() => {
+      void fitView({ padding: 0.3, duration: 240 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [layoutMode, treeShape, treeRootId, nodes.length, edges.length, fitView]);
+
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
       onNodeClick={onNodeClick}
+      onNodeDoubleClick={onNodeDoubleClick}
       onEdgeClick={onEdgeClick}
+      onConnect={onConnect}
       onPaneClick={clearSelection}
+      nodesDraggable={layoutMode === "free"}
       fitView
       fitViewOptions={{ padding: 0.3 }}
       proOptions={{ hideAttribution: true }}
@@ -69,6 +113,31 @@ export function GraphCanvas() {
       <Background color="#d8d6cf" gap={28} />
       <Controls showInteractive={false} />
       <MiniMap pannable zoomable nodeColor="#c3c1ba" maskColor="rgba(244,243,239,0.7)" />
+      <ViewportPortal>
+        {layoutMode === "tree" && treeShape === "radial"
+          ? radialLabels.map((item) => (
+              <div
+                key={item.category}
+                style={{
+                  position: "absolute",
+                  transform: `translate(${item.position.x}px, ${item.position.y}px) translate(-50%, -50%)`,
+                  color: item.color,
+                  fontSize: 12,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                  opacity: 0.35,
+                  pointerEvents: "none",
+                  background: "rgba(255,255,255,0.42)",
+                  borderRadius: 999,
+                  padding: "2px 8px",
+                }}
+              >
+                {item.label}
+              </div>
+            ))
+          : null}
+      </ViewportPortal>
     </ReactFlow>
   );
 }

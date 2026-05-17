@@ -8,10 +8,16 @@
  */
 import { useMemo } from "react";
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
-import type { Person } from "../types";
-import { WEAK_RELATIONSHIP_TYPES } from "../constants";
+import type { Person, RelationshipCategory, XYPosition } from "../types";
+import { CATEGORIES, WEAK_RELATIONSHIP_TYPES } from "../constants";
 import { useGraphStore } from "../store/useGraphStore";
 import { autoLayout, buildAdjacency, getNodesWithinDegrees } from "../lib/graph";
+import {
+  buildTreeStructure,
+  computeRadialCategoryLabels,
+  computeTreeLayout,
+  isTreePrimaryEdge,
+} from "./layout";
 
 export interface PersonNodeData extends Record<string, unknown> {
   person: Person;
@@ -27,6 +33,12 @@ export type PersonNode = Node<PersonNodeData, "person">;
 export interface GraphView {
   nodes: PersonNode[];
   edges: Edge[];
+  radialLabels: Array<{
+    category: RelationshipCategory;
+    label: string;
+    color: string;
+    position: XYPosition;
+  }>;
 }
 
 export function useGraphView(): GraphView {
@@ -43,6 +55,9 @@ export function useGraphView(): GraphView {
   const focusDegrees = useGraphStore((s) => s.focusDegrees);
   const pathPersonIds = useGraphStore((s) => s.pathPersonIds);
   const relationshipColors = useGraphStore((s) => s.relationshipColors);
+  const layoutMode = useGraphStore((s) => s.layoutMode);
+  const treeShape = useGraphStore((s) => s.treeShape);
+  const treeRootId = useGraphStore((s) => s.treeRootId);
 
   return useMemo<GraphView>(() => {
     const graph = { people, relationships };
@@ -68,12 +83,23 @@ export function useGraphView(): GraphView {
       if (edge) pathEdgeSet.add(edge.id);
     }
 
+    const treeActive =
+      layoutMode === "tree" && treeRootId !== null && people.some((p) => p.id === treeRootId);
+
+    const treeStructure = treeActive ? buildTreeStructure(graph, treeRootId!) : null;
+    const treePositions =
+      treeActive && treeRootId
+        ? computeTreeLayout(graph, treeRootId, treeShape)
+        : null;
+
     const query = searchQuery.trim().toLowerCase();
     const visible = new Set(visibleCategories);
 
     const nodes: PersonNode[] = people.map((person, i) => {
       const position =
-        positions[person.id] ?? autoLayout(i, people.length);
+        treePositions?.[person.id] ??
+        positions[person.id] ??
+        autoLayout(i, people.length);
       const inFocus = focusSet ? focusSet.has(person.id) : true;
       const onPath = pathNodeSet.has(person.id);
       const searchMatch = query.length > 0 && person.name.toLowerCase().includes(query);
@@ -102,25 +128,39 @@ export function useGraphView(): GraphView {
       .filter((r) => !(hideWeak && WEAK_RELATIONSHIP_TYPES.has(r.type)))
       .map((r) => {
         const onPath = pathEdgeSet.has(r.id);
+        const secondary =
+          treeActive && treeStructure
+            ? !isTreePrimaryEdge(treeStructure, r.source, r.target)
+            : false;
         const dimmed =
           (focusSet !== null &&
             !(focusSet.has(r.source) && focusSet.has(r.target))) ||
           (pathPersonIds.length > 0 && !onPath);
         const color = r.color ?? relationshipColors[r.category];
+        const baseOpacity = dimmed ? 0.12 : 1;
+        const opacity = secondary && !dimmed ? 0.4 : baseOpacity;
+        const strokeWidth = secondary && !onPath ? 1.4 : onPath ? 4 : 2;
         return {
           id: r.id,
           source: r.source,
           target: r.target,
+          type: "relationship",
           label: showLabels ? r.type : undefined,
           selected: selectedRelationshipId === r.id,
+          data: {
+            layoutMode,
+            treeShape,
+            secondary,
+          },
           markerEnd:
             r.direction === "one-way"
               ? { type: MarkerType.ArrowClosed, color }
               : undefined,
           style: {
             stroke: color,
-            strokeWidth: onPath ? 4 : 2,
-            opacity: dimmed ? 0.12 : 1,
+            strokeWidth,
+            opacity,
+            strokeDasharray: secondary && !onPath ? "6 4" : undefined,
           },
           labelStyle: {
             fill: "#1a1d24",
@@ -134,7 +174,22 @@ export function useGraphView(): GraphView {
         };
       });
 
-    return { nodes, edges };
+    const radialLabels =
+      treeActive && treeRootId && treeShape === "radial" && treeStructure && treePositions
+        ? computeRadialCategoryLabels(
+            graph,
+            treeRootId,
+            treePositions,
+            treeStructure,
+            relationshipColors,
+          )
+        : [];
+
+    const sortedLabels = CATEGORIES.flatMap((category) =>
+      radialLabels.filter((label) => label.category === category),
+    );
+
+    return { nodes, edges, radialLabels: sortedLabels };
   }, [
     people,
     relationships,
@@ -149,5 +204,8 @@ export function useGraphView(): GraphView {
     focusDegrees,
     pathPersonIds,
     relationshipColors,
+    layoutMode,
+    treeShape,
+    treeRootId,
   ]);
 }

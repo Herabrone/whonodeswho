@@ -76,9 +76,8 @@ A bar in the bottom-center region with:
   *"Showing Alice + 12 people within 2 degrees."* Compute the count with
   `getNodesWithinDegrees`.
 - a **clear** button → `clearFocus()`.
-- **Convenience:** a "Focus selected" affordance that reads `selectedPersonId`
-  and calls `setFocus(selectedPersonId)` so clicking a node then this button
-  focuses it. Optional but recommended.
+- **Convenience:** double-clicking a person node should call
+  `setFocus(personId)` so users can focus directly from the canvas.
 
 ### B2 — Degrees-of-Separation finder
 A control (button in the bar → opens a small panel or modal) that lets the user

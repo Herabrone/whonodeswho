@@ -23,6 +23,11 @@ export class LocalStorageStore implements RelationshipStore {
           relationships: parsed.graph.relationships ?? [],
         },
         positions: parsed.positions ?? {},
+        layout: {
+          layoutMode: parsed.layout?.layoutMode ?? EMPTY_STATE.layout.layoutMode,
+          treeShape: parsed.layout?.treeShape ?? EMPTY_STATE.layout.treeShape,
+          treeRootId: parsed.layout?.treeRootId ?? EMPTY_STATE.layout.treeRootId,
+        },
       };
     } catch (err) {
       console.error("[LocalStorageStore] load failed:", err);

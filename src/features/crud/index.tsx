@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CATEGORIES,
   RELATIONSHIP_CATALOG,
@@ -15,6 +15,10 @@ import type {
   RelationshipDirection,
   RelationshipInput,
 } from "../../types";
+import {
+  OPEN_RELATIONSHIP_COMPOSER_EVENT,
+  type OpenRelationshipComposerDetail,
+} from "./relationshipComposerEvent";
 
 type ModalState =
   | { type: "none" }
@@ -210,11 +214,28 @@ export function CrudFeature() {
     setModal({ type: "person-edit", person });
   };
 
-  const openRelationshipCreate = () => {
-    setRelationshipDraft(initialRelationshipDraft());
+  const openRelationshipCreate = (sourceId?: string, targetId?: string) => {
+    const draft = initialRelationshipDraft();
+    if (sourceId) draft.source = sourceId;
+    if (targetId) draft.target = targetId;
+    setRelationshipDraft(draft);
     setRelationshipError("");
     setModal({ type: "relationship-create" });
   };
+
+  useEffect(() => {
+    const onOpenComposer = (event: Event) => {
+      const customEvent = event as CustomEvent<OpenRelationshipComposerDetail>;
+      const detail = customEvent.detail;
+      if (!detail?.sourceId || !detail?.targetId) return;
+      openRelationshipCreate(detail.sourceId, detail.targetId);
+    };
+
+    window.addEventListener(OPEN_RELATIONSHIP_COMPOSER_EVENT, onOpenComposer);
+    return () => {
+      window.removeEventListener(OPEN_RELATIONSHIP_COMPOSER_EVENT, onOpenComposer);
+    };
+  }, []);
 
   const openRelationshipEdit = (relationship: Relationship) => {
     setRelationshipDraft(initialRelationshipDraft(relationship));
@@ -388,7 +409,7 @@ export function CrudFeature() {
           </button>
           <button
             type="button"
-            onClick={openRelationshipCreate}
+            onClick={() => openRelationshipCreate()}
             className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
           >
             + Relationship
@@ -435,19 +456,45 @@ export function CrudFeature() {
                 <div className="mb-2 text-sm text-muted">
                   Relationships ({relatedToSelectedPerson.length})
                 </div>
-                <ul className="mb-4 max-h-52 space-y-1 overflow-auto rounded border border-line bg-canvas p-2">
+                <ul className="mb-3 max-h-64 space-y-2 overflow-auto rounded border border-line bg-canvas p-2">
                   {relatedToSelectedPerson.map((rel) => {
                     const otherId = rel.source === selectedPerson.id ? rel.target : rel.source;
                     const otherName = peopleById.get(otherId)?.name ?? "Unknown";
                     return (
-                      <li key={rel.id}>
+                      <li key={rel.id} className="rounded border border-line bg-panel/70 p-2">
                         <button
                           type="button"
                           onClick={() => selectRelationship(rel.id)}
-                          className="w-full rounded px-2 py-1 text-left text-xs text-ink hover:bg-panel"
+                          className="w-full rounded text-left hover:bg-panel"
                         >
-                          {rel.type} · {otherName}
+                          <div className="text-sm text-ink">{rel.type} · {otherName}</div>
+                          <div className="mt-1 text-xs text-muted">
+                            {categoryLabels[rel.category]} · {rel.direction}
+                          </div>
+                          {rel.notes && (
+                            <div className="mt-1 line-clamp-2 text-xs text-muted">{rel.notes}</div>
+                          )}
                         </button>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openRelationshipEdit(rel)}
+                            className="rounded border border-line bg-canvas px-2 py-1 text-xs text-ink hover:bg-panel"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm("Delete this relationship?")) {
+                                deleteRelationship(rel.id);
+                              }
+                            }}
+                            className="rounded border border-red-400 bg-red-50 px-2 py-1 text-xs text-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </li>
                     );
                   })}
@@ -455,6 +502,16 @@ export function CrudFeature() {
                     <li className="px-2 py-1 text-xs text-muted">No relationships</li>
                   )}
                 </ul>
+
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    onClick={() => openRelationshipCreate(selectedPerson.id)}
+                    className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+                  >
+                    Add relationship for {selectedPerson.name}
+                  </button>
+                </div>
 
                 <div className="flex gap-2">
                   <button

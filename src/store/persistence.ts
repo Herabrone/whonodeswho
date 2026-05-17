@@ -21,4 +21,9 @@ export interface RelationshipStore {
 export const EMPTY_STATE: PersistedState = {
   graph: { people: [], relationships: [] },
   positions: {},
+  layout: {
+    layoutMode: "free",
+    treeShape: "radial",
+    treeRootId: null,
+  },
 };
