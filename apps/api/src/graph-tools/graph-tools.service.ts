@@ -18,9 +18,11 @@ import type {
 import { randomUUID } from 'crypto';
 import { GraphService } from '../graph/graph.service';
 import { PrismaService } from '../prisma/prisma.service';
-
-type RelationshipType =
-  (typeof GraphToolsService.ALLOWED_RELATIONSHIP_TYPES)[number];
+import {
+  categoryForRelationshipType,
+  isAllowedRelationshipType,
+  type RelationshipType,
+} from './constants';
 
 interface CreateRelationshipInput {
   fromPersonId: string;
@@ -39,18 +41,6 @@ interface ValidationResult {
 
 @Injectable()
 export class GraphToolsService {
-  static readonly ALLOWED_RELATIONSHIP_TYPES = [
-    'friend',
-    'family',
-    'coworker',
-    'classmate',
-    'partner',
-    'met_at_event',
-    'mutual_contact',
-    'professional_contact',
-    'unknown',
-  ] as const;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly graphService: GraphService,
@@ -323,7 +313,7 @@ export class GraphToolsService {
       );
     }
 
-    if (!this.isAllowedRelationshipType(input.relationshipType)) {
+    if (!isAllowedRelationshipType(input.relationshipType)) {
       throw new BadRequestException('Relationship type is not allowed.');
     }
 
@@ -359,7 +349,7 @@ export class GraphToolsService {
       fromPerson,
       toPerson,
       relationshipType: input.relationshipType,
-      category: this.categoryForRelationshipType(input.relationshipType),
+      category: categoryForRelationshipType(input.relationshipType),
       direction: 'two-way',
     };
   }
@@ -425,34 +415,12 @@ export class GraphToolsService {
     return Math.min(Math.max(Math.trunc(value), min), max);
   }
 
-  private isAllowedRelationshipType(value: string): value is RelationshipType {
-    return GraphToolsService.ALLOWED_RELATIONSHIP_TYPES.includes(
-      value as RelationshipType,
-    );
-  }
-
-  private categoryForRelationshipType(
-    type: RelationshipType,
-  ): RelationshipCategory {
-    if (type === 'family') {
-      return 'family';
-    }
-    if (type === 'friend') {
-      return 'friend';
-    }
-    if (type === 'partner') {
-      return 'romantic';
-    }
-    if (type === 'coworker' || type === 'professional_contact') {
-      return 'work';
-    }
-    return 'other';
-  }
-
   private toContractPerson(person: DbPerson) {
+    const aliases = this.parseAliases(person.aliasesJson);
     return {
       id: person.id,
       name: person.name,
+      ...(aliases.length > 0 ? { aliases } : {}),
       ...(person.notes ? { notes: person.notes } : {}),
       ...(person.color ? { color: person.color } : {}),
       createdAt: person.createdAt.toISOString(),
@@ -485,5 +453,16 @@ export class GraphToolsService {
       createdAt: relationship.createdAt.toISOString(),
       updatedAt: relationship.updatedAt.toISOString(),
     };
+  }
+
+  private parseAliases(value: string): string[] {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === 'string')
+        : [];
+    } catch {
+      return [];
+    }
   }
 }
