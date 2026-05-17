@@ -36,6 +36,7 @@ export function GraphCanvas() {
   const selectPerson = useGraphStore((s) => s.selectPerson);
   const selectRelationship = useGraphStore((s) => s.selectRelationship);
   const clearSelection = useGraphStore((s) => s.clearSelection);
+  const setFocus = useGraphStore((s) => s.setFocus);
   const layoutMode = useGraphStore((s) => s.layoutMode);
   const treeShape = useGraphStore((s) => s.treeShape);
   const treeRootId = useGraphStore((s) => s.treeRootId);
@@ -81,9 +82,11 @@ export function GraphCanvas() {
         requestAnimationFrame(() => {
           void fitView({ padding: 0.25, duration: 220 });
         });
+        return;
       }
+      setFocus(personId);
     },
-    [fitView, layoutMode, setTreeRoot],
+    [fitView, layoutMode, setFocus, setTreeRoot],
   );
 
   const onEdgeClick = useCallback<EdgeMouseHandler<Edge>>(

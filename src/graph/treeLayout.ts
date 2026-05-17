@@ -44,6 +44,8 @@ export interface TreeLayout {
     category: RelationshipCategory;
     relationshipType: string;
     originalRelationshipId: string;
+    labelRank: number;
+    labelCount: number;
   }>;
   disconnectedIds: string[];
 }
@@ -166,6 +168,8 @@ export function computeCategoryTree(graph: GraphData, rootId: string): TreeLayou
         category,
         relationshipType: entry.relationshipType,
         originalRelationshipId: entry.relationshipId,
+        labelRank: personIndex,
+        labelCount: entries.length,
       });
     });
 

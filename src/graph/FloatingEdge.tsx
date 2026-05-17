@@ -2,6 +2,7 @@ import { memo } from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
+  Position,
   getBezierPath,
   getSmoothStepPath,
   getStraightPath,
@@ -15,6 +16,28 @@ interface RelationshipEdgeData {
   layoutMode: "free" | "tree";
   treeShape: TreeShape;
   secondary?: boolean;
+  labelRank?: number;
+  labelCount?: number;
+}
+
+interface NodeGeometry {
+  measured?: {
+    width?: number;
+    height?: number;
+  };
+  width?: number;
+  height?: number;
+  internals?: {
+    positionAbsolute?: { x: number; y: number };
+  };
+}
+
+function nodeRect(node: NodeGeometry) {
+  const width = node.measured?.width ?? node.width ?? 96;
+  const height = node.measured?.height ?? node.height ?? 48;
+  const x = node.internals?.positionAbsolute?.x ?? 0;
+  const y = node.internals?.positionAbsolute?.y ?? 0;
+  return { x, y, width, height };
 }
 
 function FloatingEdgeComponent(props: EdgeProps) {
@@ -37,8 +60,35 @@ function FloatingEdgeComponent(props: EdgeProps) {
 
   if (!sourceNode || !targetNode) return null;
 
-  const { sx, sy, tx, ty, sourcePos, targetPos } = getEdgeParams(sourceNode, targetNode);
+  const sourceHandleId = (props as EdgeProps & { sourceHandleId?: string }).sourceHandleId;
+  const targetHandleId = (props as EdgeProps & { targetHandleId?: string }).targetHandleId;
+  let { sx, sy, tx, ty, sourcePos, targetPos } = getEdgeParams(sourceNode, targetNode);
   const edgeData = data as RelationshipEdgeData | undefined;
+
+  if (edgeData?.layoutMode === "tree" && edgeData.treeShape === "grouped") {
+    const sourceRect = nodeRect(sourceNode);
+    const targetRect = nodeRect(targetNode);
+
+    if (sourceHandleId === "sb" || sourceHandleId === "cat-b") {
+      sx = sourceRect.x + sourceRect.width / 2;
+      sy = sourceRect.y + sourceRect.height;
+      sourcePos = Position.Bottom;
+    } else if (sourceHandleId === "st" || sourceHandleId === "cat-t") {
+      sx = sourceRect.x + sourceRect.width / 2;
+      sy = sourceRect.y;
+      sourcePos = Position.Top;
+    }
+
+    if (targetHandleId === "cat-t" || targetHandleId === "t") {
+      tx = targetRect.x + targetRect.width / 2;
+      ty = targetRect.y;
+      targetPos = Position.Top;
+    } else if (targetHandleId === "cat-b" || targetHandleId === "b") {
+      tx = targetRect.x + targetRect.width / 2;
+      ty = targetRect.y + targetRect.height;
+      targetPos = Position.Bottom;
+    }
+  }
 
   let pathResult: [string, number, number];
 
@@ -78,7 +128,15 @@ function FloatingEdgeComponent(props: EdgeProps) {
     pathResult = [path, labelX, labelY];
   }
 
-  const [path, labelX, labelY] = pathResult;
+  const [path, labelX, baseLabelY] = pathResult;
+  const labelShiftY =
+    edgeData?.layoutMode === "tree" &&
+    edgeData.treeShape === "grouped" &&
+    typeof edgeData.labelRank === "number" &&
+    typeof edgeData.labelCount === "number"
+      ? (edgeData.labelRank - (edgeData.labelCount - 1) / 2) * 14
+      : 0;
+  const labelY = baseLabelY + labelShiftY;
   const [paddingX = 4, paddingY = 2] = labelBgPadding ?? [4, 2];
   const bgFill = labelBgStyle?.fill ?? "#ffffff";
   const bgOpacity = labelBgStyle?.opacity ?? 0.9;

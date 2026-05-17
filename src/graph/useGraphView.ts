@@ -179,20 +179,23 @@ export function useGraphView(): GraphView {
 
       const edges: Edge[] = [
         ...layout.categoryEdges.map((edge) => {
-          const color = CATEGORY_COLORS[edge.category];
           return {
             id: edge.id,
             source: edge.source,
             target: edge.target,
+            sourceHandle: "sb",
+            targetHandle: "cat-t",
             type: "relationship",
             data: {
               layoutMode,
               treeShape,
+              labelRank: edge.labelRank,
+              labelCount: edge.labelCount,
             },
             style: {
-              stroke: color,
-              strokeWidth: 1.5,
-              opacity: 0.4,
+              stroke: "#868e96",
+              strokeWidth: 1.2,
+              opacity: 0.7,
             },
           } satisfies Edge;
         }),
@@ -202,6 +205,8 @@ export function useGraphView(): GraphView {
             id: edge.id,
             source: edge.source,
             target: edge.target,
+            sourceHandle: "cat-b",
+            targetHandle: "t",
             type: "relationship",
             label: edge.relationshipType,
             data: {
@@ -210,7 +215,7 @@ export function useGraphView(): GraphView {
             },
             style: {
               stroke: color,
-              strokeWidth: 1.5,
+              strokeWidth: 2,
               opacity: 1,
             },
             labelStyle: {
