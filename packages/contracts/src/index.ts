@@ -77,3 +77,56 @@ export interface AuthUser {
 export interface AuthSessionResponse {
   user: AuthUser | null;
 }
+
+export type ChatMessageRole = "user" | "assistant" | "tool";
+
+export interface ConversationSummary {
+  id: string;
+  title?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatStreamRequest {
+  conversationId?: string;
+  message: string;
+}
+
+export type PendingActionType = "create_relationship";
+
+export interface PendingCreateRelationshipPayload {
+  fromPersonId: string;
+  fromPersonName: string;
+  toPersonId: string;
+  toPersonName: string;
+  relationshipType: string;
+  category: RelationshipCategory;
+  direction: RelationshipDirection;
+  notes?: string;
+}
+
+export interface PendingAction {
+  type: PendingActionType;
+  payload: PendingCreateRelationshipPayload;
+  createdAt: string;
+}
+
+export type ChatSseEvent =
+  | { type: "conversation"; conversationId: string }
+  | { type: "token"; content: string }
+  | { type: "tool_start"; toolName: string }
+  | { type: "tool_end"; toolName: string }
+  | { type: "pending_action"; pendingAction: PendingAction; token: string }
+  | { type: "done" }
+  | { type: "error"; message: string };
+
+export interface ConfirmActionRequest {
+  token: string;
+}
+
+export interface ConfirmActionResponse {
+  success: true;
+  action: PendingAction;
+  relationship?: Relationship;
+  graph?: GraphData;
+}
