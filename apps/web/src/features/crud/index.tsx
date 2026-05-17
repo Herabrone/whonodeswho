@@ -19,6 +19,7 @@ import {
   OPEN_RELATIONSHIP_COMPOSER_EVENT,
   type OpenRelationshipComposerDetail,
 } from "./relationshipComposerEvent";
+import { YearMonthPicker } from "../timeline/YearMonthPicker";
 
 type ModalState =
   | { type: "none" }
@@ -41,6 +42,8 @@ interface RelationshipDraft {
   typeChoice: string;
   customType: string;
   direction: RelationshipDirection;
+  startYear?: number;
+  startMonth?: number;
   color: string;
   notes: string;
 }
@@ -83,6 +86,8 @@ function initialRelationshipDraft(relationship?: Relationship): RelationshipDraf
     typeChoice: relationship ? (hasCatalogType ? relationship.type : "__custom__") : availableTypes[0],
     customType: relationship && !hasCatalogType ? relationship.type : "",
     direction: relationship?.direction ?? "two-way",
+    startYear: relationship?.startYear,
+    startMonth: relationship?.startMonth,
     color: relationship?.color ?? "",
     notes: relationship?.notes ?? "",
   };
@@ -162,6 +167,7 @@ export function CrudFeature() {
   const [personError, setPersonError] = useState("");
   const [relationshipDraft, setRelationshipDraft] = useState<RelationshipDraft>(initialRelationshipDraft());
   const [relationshipError, setRelationshipError] = useState("");
+  const [endConfirmId, setEndConfirmId] = useState<string | null>(null);
 
   const jsonInputRef = useRef<HTMLInputElement | null>(null);
   const csvPeopleInputRef = useRef<HTMLInputElement | null>(null);
@@ -203,6 +209,7 @@ export function CrudFeature() {
   const addRelationship = useGraphStore((s) => s.addRelationship);
   const updateRelationship = useGraphStore((s) => s.updateRelationship);
   const deleteRelationship = useGraphStore((s) => s.deleteRelationship);
+  const endRelationship = useGraphStore((s) => s.endRelationship);
   const replaceGraph = useGraphStore((s) => s.replaceGraph);
 
   const selectRelationship = useGraphStore((s) => s.selectRelationship);
@@ -256,6 +263,7 @@ export function CrudFeature() {
     setImportMessage("");
     setPersonError("");
     setRelationshipError("");
+    setEndConfirmId(null);
   };
 
   const submitPerson = () => {
@@ -304,6 +312,8 @@ export function CrudFeature() {
       category: relationshipDraft.category,
       type: resolvedType,
       direction: relationshipDraft.direction,
+      startYear: relationshipDraft.startYear,
+      startMonth: relationshipDraft.startMonth,
       color: relationshipDraft.color || undefined,
       notes: relationshipDraft.notes.trim() || undefined,
     };
@@ -345,6 +355,10 @@ export function CrudFeature() {
         "category",
         "type",
         "direction",
+        "startYear",
+        "startMonth",
+        "endYear",
+        "isActive",
         "color",
         "notes",
         "createdAt",
@@ -357,6 +371,10 @@ export function CrudFeature() {
         r.category,
         r.type,
         r.direction,
+        r.startYear?.toString() ?? "",
+        r.startMonth?.toString() ?? "",
+        r.endYear?.toString() ?? "",
+        r.isActive === undefined ? "" : String(r.isActive),
         r.color ?? "",
         r.notes ?? "",
         r.createdAt,
@@ -578,6 +596,26 @@ export function CrudFeature() {
                     <dd>{selectedRelationship.direction}</dd>
                   </div>
                   <div>
+                    <dt className="text-muted">Started</dt>
+                    <dd>
+                      {selectedRelationship.startYear
+                        ? `${selectedRelationship.startYear}${
+                            selectedRelationship.startMonth
+                              ? ` / ${selectedRelationship.startMonth}`
+                              : ""
+                          }`
+                        : "Not recorded"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Status</dt>
+                    <dd className={selectedRelationship.isActive === false ? "text-muted" : ""}>
+                      {selectedRelationship.isActive === false
+                        ? `Ended ${selectedRelationship.endYear ?? "Unknown year"}`
+                        : "Active"}
+                    </dd>
+                  </div>
+                  <div>
                     <dt className="text-muted">Notes</dt>
                     <dd>{selectedRelationship.notes || "No notes"}</dd>
                   </div>
@@ -602,7 +640,60 @@ export function CrudFeature() {
                   >
                     Delete
                   </button>
+                  {selectedRelationship.isActive === false ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateRelationship(selectedRelationship.id, {
+                          isActive: true,
+                          endYear: undefined,
+                        });
+                        setEndConfirmId(null);
+                      }}
+                      className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+                    >
+                      Reactivate
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEndConfirmId(selectedRelationship.id)}
+                      className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm text-red-700"
+                    >
+                      End this relationship
+                    </button>
+                  )}
                 </div>
+                {selectedRelationship.isActive !== false && endConfirmId === selectedRelationship.id ? (
+                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    <div>
+                      Mark {capitalizeWords(selectedRelationship.type)} with{" "}
+                      {peopleById.get(selectedRelationship.target)?.name ??
+                        peopleById.get(selectedRelationship.source)?.name ??
+                        "this person"}{" "}
+                      as ended? This sets the end year to {new Date().getFullYear()}.
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          endRelationship(selectedRelationship.id);
+                          setEndConfirmId(null);
+                        }}
+                        className="rounded border border-red-400 bg-red-600 px-2.5 py-1 text-xs font-medium text-white"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEndConfirmId(null)}
+                        className="rounded border border-line bg-white px-2.5 py-1 text-xs text-ink"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -846,6 +937,23 @@ export function CrudFeature() {
                 </div>
               </div>
 
+              <YearMonthPicker
+                startYear={relationshipDraft.startYear}
+                startMonth={relationshipDraft.startMonth}
+                onYearChange={(startYear) =>
+                  setRelationshipDraft((draft) => ({
+                    ...draft,
+                    startYear,
+                  }))
+                }
+                onMonthChange={(startMonth) =>
+                  setRelationshipDraft((draft) => ({
+                    ...draft,
+                    startMonth,
+                  }))
+                }
+              />
+
               <label className="sm:col-span-2 text-sm text-ink">
                 Notes
                 <textarea
@@ -1020,6 +1128,10 @@ function parseRelationshipsCsv(content: string): Relationship[] {
     const get = (name: string) => row[idx[name] ?? -1] ?? "";
     const category = get("category") as RelationshipCategory;
     const direction = get("direction") as RelationshipDirection;
+    const startYear = get("startYear");
+    const startMonth = get("startMonth");
+    const endYear = get("endYear");
+    const isActive = get("isActive");
     return {
       id: get("id"),
       source: get("source"),
@@ -1027,6 +1139,10 @@ function parseRelationshipsCsv(content: string): Relationship[] {
       category: CATEGORIES.includes(category) ? category : "other",
       type: get("type"),
       direction: direction === "one-way" ? "one-way" : "two-way",
+      startYear: startYear ? Number(startYear) : undefined,
+      startMonth: startMonth ? Number(startMonth) : undefined,
+      endYear: endYear ? Number(endYear) : undefined,
+      isActive: isActive === "" ? undefined : isActive === "true",
       color: get("color") || undefined,
       notes: get("notes") || undefined,
       createdAt: get("createdAt") || new Date().toISOString(),

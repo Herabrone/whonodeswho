@@ -1,18 +1,15 @@
 /**
- * AppShell — application chrome.
- * Renders the header and hosts the graph canvas plus the three feature
- * overlays. Layout is intentionally flat: features position themselves as
- * absolute overlays within reserved regions (see each feature stub).
+ * AppShell - application chrome.
+ * Renders the header and hosts the graph canvas plus the feature overlays.
  */
 import type { ReactNode } from "react";
 import { Legend } from "./Legend";
+import { TimelineToggleButton } from "./TimelineToggleButton";
 import { useGraphStore } from "../store/useGraphStore";
 import { useAuth } from "../auth/AuthContext";
 
 interface AppShellProps {
-  /** The graph canvas. */
   canvas: ReactNode;
-  /** Feature overlays (Track A / B / C). */
   overlays: ReactNode;
 }
 
@@ -96,12 +93,13 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
               </button>
             </div>
           ) : null}
+          <TimelineToggleButton />
           <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
-            Phase 0 · foundation
+            Phase 0 - foundation
           </span>
           <button
             onClick={signOut}
-            className="text-xs font-medium text-muted hover:text-ink transition-colors"
+            className="text-xs font-medium text-muted transition-colors hover:text-ink"
           >
             Sign out
           </button>

@@ -73,4 +73,104 @@ describe("useGraphStore http persistence", () => {
     expect(s.hydrated).toBe(false);
     expect(s._persistence).toBeNull();
   });
+
+  it("opens the timeline at the earliest known start year", () => {
+    useGraphStore.setState({
+      relationships: [
+        {
+          id: "r1",
+          source: "p1",
+          target: "p2",
+          type: "friend",
+          category: "friend",
+          direction: "two-way",
+          startYear: 2019,
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+        {
+          id: "r2",
+          source: "p2",
+          target: "p3",
+          type: "coworker",
+          category: "work",
+          direction: "two-way",
+          startYear: 2016,
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    useGraphStore.getState().openTimeline();
+
+    const s = useGraphStore.getState();
+    expect(s.timelineOpen).toBe(true);
+    expect(s.timelineYear).toBe(2016);
+  });
+
+  it("falls back when opening the timeline with no dated relationships", () => {
+    const currentYear = new Date().getFullYear();
+    useGraphStore.setState({
+      relationships: [
+        {
+          id: "r1",
+          source: "p1",
+          target: "p2",
+          type: "friend",
+          category: "friend",
+          direction: "two-way",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    useGraphStore.getState().openTimeline();
+
+    expect(useGraphStore.getState().timelineYear).toBe(currentYear - 5);
+  });
+
+  it("supports updater functions for timeline year", () => {
+    useGraphStore.setState({ timelineYear: 2020 });
+
+    useGraphStore.getState().setTimelineYear((prev) => prev + 1.5);
+
+    expect(useGraphStore.getState().timelineYear).toBe(2021.5);
+  });
+
+  it("closes the timeline and stops playback", () => {
+    useGraphStore.setState({ timelineOpen: true, timelinePlaying: true });
+
+    useGraphStore.getState().closeTimeline();
+
+    const s = useGraphStore.getState();
+    expect(s.timelineOpen).toBe(false);
+    expect(s.timelinePlaying).toBe(false);
+  });
+
+  it("marks a relationship as ended", () => {
+    const currentYear = new Date().getFullYear();
+    useGraphStore.setState({
+      relationships: [
+        {
+          id: "r1",
+          source: "p1",
+          target: "p2",
+          type: "friend",
+          category: "friend",
+          direction: "two-way",
+          isActive: true,
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    useGraphStore.getState().endRelationship("r1");
+
+    const relationship = useGraphStore.getState().relationships[0];
+    expect(relationship.isActive).toBe(false);
+    expect(relationship.endYear).toBe(currentYear);
+  });
 });

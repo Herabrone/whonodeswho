@@ -75,6 +75,13 @@ interface LayoutSlice {
   treeRootId: string | null;
 }
 
+interface TimelineSlice {
+  timelineOpen: boolean;
+  timelineYear: number;
+  timelinePlaying: boolean;
+  timelineSpeed: 1 | 2 | 3;
+}
+
 interface Lifecycle {
   hydrated: boolean;
   _persistence: RelationshipStore | null;
@@ -86,6 +93,7 @@ export interface GraphStore
     ViewSlice,
     FocusSlice,
     LayoutSlice,
+    TimelineSlice,
     Lifecycle {
   // -- lifecycle --
   hydrate: () => Promise<void>;
@@ -125,6 +133,14 @@ export interface GraphStore
   setLayoutMode: (mode: LayoutMode) => void;
   setTreeShape: (shape: TreeShape) => void;
   setTreeRoot: (personId: string | null) => void;
+
+  // -- timeline actions (Timeline feature) --
+  openTimeline: () => void;
+  closeTimeline: () => void;
+  setTimelineYear: (value: number | ((prev: number) => number)) => void;
+  setTimelinePlaying: (value: boolean) => void;
+  setTimelineSpeed: (speed: 1 | 2 | 3) => void;
+  endRelationship: (id: string) => void;
 
   // -- legend actions (Contract Amendment) --
   updateCategoryLabel: (category: RelationshipCategory, label: string) => void;
@@ -180,6 +196,15 @@ const LAYOUT_DEFAULTS: LayoutSlice = {
   treeRootId: null,
 };
 
+const getCurrentYear = () => new Date().getFullYear();
+
+const TIMELINE_DEFAULTS: TimelineSlice = {
+  timelineOpen: false,
+  timelineYear: getCurrentYear(),
+  timelinePlaying: false,
+  timelineSpeed: 1,
+};
+
 export const useGraphStore = create<GraphStore>((set, get) => ({
   // initial state
   people: [],
@@ -190,6 +215,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   ...VIEW_DEFAULTS,
   ...LEGEND_DEFAULTS,
   ...LAYOUT_DEFAULTS,
+  ...TIMELINE_DEFAULTS,
   focusPersonId: null,
   focusDegrees: 1,
   pathPersonIds: [],
@@ -221,6 +247,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedRelationshipId: null,
       focusPersonId: null,
       pathPersonIds: [],
+      ...TIMELINE_DEFAULTS,
       hydrated: false,
       _persistence: null,
     });
@@ -364,6 +391,33 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setTreeRoot: (personId) => {
     set({ treeRootId: personId });
     scheduleSave(get);
+  },
+
+  // -- timeline actions --
+  openTimeline: () => {
+    const years = get()
+      .relationships.map((relationship) => relationship.startYear)
+      .filter((year): year is number => typeof year === "number");
+    const earliestYear =
+      years.length > 0 ? Math.min(...years) : getCurrentYear() - 5;
+    set({
+      timelineOpen: true,
+      timelineYear: earliestYear,
+    });
+  },
+  closeTimeline: () => set({ timelineOpen: false, timelinePlaying: false }),
+  setTimelineYear: (value) =>
+    set((s) => ({
+      timelineYear:
+        typeof value === "function" ? value(s.timelineYear) : value,
+    })),
+  setTimelinePlaying: (value) => set({ timelinePlaying: value }),
+  setTimelineSpeed: (speed) => set({ timelineSpeed: speed }),
+  endRelationship: (id) => {
+    get().updateRelationship(id, {
+      endYear: getCurrentYear(),
+      isActive: false,
+    });
   },
 
   // -- legend actions --

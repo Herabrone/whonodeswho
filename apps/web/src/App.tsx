@@ -11,6 +11,7 @@ import { useGraphStore } from "./store/useGraphStore";
 import { CrudFeature } from "./features/crud";
 import { IntelligenceFeature } from "./features/intelligence";
 import { FilteringFeature } from "./features/filtering";
+import { TimelineFeature } from "./features/timeline";
 import { AuthProvider } from "./auth/AuthContext";
 import { AuthGuard } from "./auth/AuthGuard";
 
@@ -49,6 +50,7 @@ function AuthenticatedApp() {
             <CrudFeature />
             <IntelligenceFeature />
             <FilteringFeature />
+            <TimelineFeature />
           </>
         }
       />

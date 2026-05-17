@@ -8,7 +8,7 @@
  */
 import { useMemo } from "react";
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
-import type { Person, RelationshipCategory, XYPosition } from "../types";
+import type { Person, Relationship, RelationshipCategory, XYPosition } from "../types";
 import { CATEGORIES, CATEGORY_COLORS, WEAK_RELATIONSHIP_TYPES } from "../constants";
 import { useGraphStore } from "../store/useGraphStore";
 import { autoLayout, buildAdjacency, getNodesWithinDegrees } from "../lib/graph";
@@ -45,6 +45,41 @@ export interface GraphView {
   groupedDivider: { x: number; yTop: number; yBottom: number } | null;
 }
 
+interface TimelineRelationshipState {
+  hidden: boolean;
+  ended: boolean;
+  opacity?: number;
+}
+
+function getTimelineRelationshipState(
+  timelineOpen: boolean,
+  timelineYear: number,
+  relationship?: Pick<Relationship, "startYear" | "endYear" | "isActive">,
+): TimelineRelationshipState {
+  if (!timelineOpen || relationship?.startYear === undefined) {
+    return { hidden: false, ended: false };
+  }
+
+  if (timelineYear < relationship.startYear) {
+    return { hidden: true, ended: false };
+  }
+
+  const ended =
+    relationship.isActive === false &&
+    relationship.endYear !== undefined &&
+    timelineYear >= relationship.endYear;
+
+  if (ended) {
+    return { hidden: false, ended: true, opacity: 0.2 };
+  }
+
+  return {
+    hidden: false,
+    ended: false,
+    opacity: Math.min(1, (timelineYear - relationship.startYear) / 0.4),
+  };
+}
+
 export function useGraphView(): GraphView {
   const people = useGraphStore((s) => s.people);
   const relationships = useGraphStore((s) => s.relationships);
@@ -62,19 +97,22 @@ export function useGraphView(): GraphView {
   const layoutMode = useGraphStore((s) => s.layoutMode);
   const treeShape = useGraphStore((s) => s.treeShape);
   const treeRootId = useGraphStore((s) => s.treeRootId);
+  const timelineOpen = useGraphStore((s) => s.timelineOpen);
+  const timelineYear = useGraphStore((s) => s.timelineYear);
 
   return useMemo<GraphView>(() => {
     const graph = { people, relationships };
     const peopleById = new Map(people.map((person) => [person.id, person]));
+    const relationshipsById = new Map(
+      relationships.map((relationship) => [relationship.id, relationship]),
+    );
     const adj = buildAdjacency(graph);
 
-    // Focus set: people within N degrees of the focused person.
     const focusSet =
       focusPersonId !== null
         ? getNodesWithinDegrees(adj, focusPersonId, focusDegrees)
         : null;
 
-    // Degrees-of-separation path sets.
     const pathNodeSet = new Set(pathPersonIds);
     const pathEdgeSet = new Set<string>();
     for (let i = 0; i < pathPersonIds.length - 1; i++) {
@@ -95,6 +133,7 @@ export function useGraphView(): GraphView {
     if (groupedTreeActive && treeRootId) {
       const layout = computeCategoryTree(graph, treeRootId);
       const query = searchQuery.trim().toLowerCase();
+      const visibleTimelineNodeIds = new Set<string>([treeRootId]);
 
       const nodes: Array<PersonNode | CategoryNode> = [];
       const root = peopleById.get(treeRootId);
@@ -178,58 +217,83 @@ export function useGraphView(): GraphView {
       }
 
       const edges: Edge[] = [
-        ...layout.categoryEdges.map((edge) => {
-          return {
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            sourceHandle: "sb",
-            targetHandle: "cat-t",
-            type: "relationship",
-            data: {
-              layoutMode,
-              treeShape,
-              labelRank: edge.labelRank,
-              labelCount: edge.labelCount,
-            },
-            style: {
-              stroke: "#868e96",
-              strokeWidth: 1.2,
-              opacity: 0.7,
-            },
-          } satisfies Edge;
-        }),
-        ...layout.personEdges.map((edge) => {
-          const color = CATEGORY_COLORS[edge.category];
-          return {
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            sourceHandle: "cat-b",
-            targetHandle: "t",
-            type: "relationship",
-            label: edge.relationshipType,
-            data: {
-              layoutMode,
-              treeShape,
-            },
-            style: {
-              stroke: color,
-              strokeWidth: 2,
-              opacity: 1,
-            },
-            labelStyle: {
-              fill: "#1a1d24",
-              fontSize: 11,
-              fontWeight: 500,
-              opacity: 1,
-            },
-            labelBgStyle: { fill: "#ffffff", opacity: 0.9 },
-            labelBgPadding: [4, 2] as [number, number],
-            labelBgBorderRadius: 4,
-          } satisfies Edge;
-        }),
+        ...layout.categoryEdges.map((edge) => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: "sb",
+          targetHandle: "cat-t",
+          type: "relationship",
+          data: {
+            layoutMode,
+            treeShape,
+          },
+          style: {
+            stroke: "#868e96",
+            strokeWidth: 1.2,
+            opacity: 0.7,
+          },
+        })),
+        ...layout.personEdges.flatMap((edge) => {
+            const relationship = relationshipsById.get(edge.originalRelationshipId);
+            const timelineState = getTimelineRelationshipState(
+              timelineOpen,
+              timelineYear,
+              relationship,
+            );
+            if (timelineState.hidden) return [];
+
+            visibleTimelineNodeIds.add(edge.source);
+            visibleTimelineNodeIds.add(edge.target);
+
+            const color = CATEGORY_COLORS[edge.category];
+            const style = timelineState.ended
+              ? {
+                  stroke: "#9c9a93",
+                  strokeWidth: 1.5,
+                  opacity: timelineState.opacity ?? 0.2,
+                  strokeDasharray: "6 4",
+                }
+              : {
+                  stroke: color,
+                  strokeWidth: 2,
+                  opacity: timelineState.opacity ?? 1,
+                };
+
+            return [{
+              id: edge.id,
+              source: edge.source,
+              target: edge.target,
+              sourceHandle: "cat-b",
+              targetHandle: "t",
+              type: "relationship",
+              label: edge.relationshipType,
+              data: {
+                layoutMode,
+                treeShape,
+              },
+              style,
+              labelStyle: {
+                fill: "#1a1d24",
+                fontSize: 11,
+                fontWeight: 500,
+                opacity: style.opacity ?? 1,
+              },
+              labelBgStyle: { fill: "#ffffff", opacity: timelineState.ended ? 0.35 : 0.9 },
+              labelBgPadding: [4, 2] as [number, number],
+              labelBgBorderRadius: 4,
+            } satisfies Edge];
+          })
+          ,
       ];
+
+      for (const node of nodes) {
+        if (node.type !== "person" || !timelineOpen) continue;
+        const personId = node.data.person.id;
+        const treeNodeVisible =
+          visibleTimelineNodeIds.has(node.id) || visibleTimelineNodeIds.has(personId);
+        node.data.dimmed = node.data.dimmed || !treeNodeVisible;
+      }
 
       let groupedDivider: GraphView["groupedDivider"] = null;
       if (layout.disconnectedIds.length > 0) {
@@ -269,38 +333,10 @@ export function useGraphView(): GraphView {
     const query = searchQuery.trim().toLowerCase();
     const visible = new Set(visibleCategories);
 
-    const nodes: Array<PersonNode | CategoryNode> = people.map((person, i) => {
-      const position =
-        treePositions?.[person.id] ??
-        positions[person.id] ??
-        autoLayout(i, people.length);
-      const inFocus = focusSet ? focusSet.has(person.id) : true;
-      const onPath = pathNodeSet.has(person.id);
-      const searchMatch = query.length > 0 && person.name.toLowerCase().includes(query);
-      // A node is dimmed if a focus is active and it's outside the focus set,
-      // or a path is active and it's not on the path.
-      const dimmed =
-        (focusSet !== null && !inFocus) ||
-        (pathPersonIds.length > 0 && !onPath);
-      return {
-        id: person.id,
-        type: "person",
-        position,
-        data: {
-          person,
-          dimmed,
-          highlighted: focusPersonId === person.id,
-          onPath,
-          searchMatch,
-          selected: selectedPersonId === person.id,
-        },
-      };
-    });
-
     const edges: Edge[] = relationships
       .filter((r) => visible.has(r.category))
       .filter((r) => !(hideWeak && WEAK_RELATIONSHIP_TYPES.has(r.type)))
-      .map((r) => {
+      .flatMap((r) => {
         const onPath = pathEdgeSet.has(r.id);
         const secondary =
           treeActive && treeStructure
@@ -314,7 +350,30 @@ export function useGraphView(): GraphView {
         const baseOpacity = dimmed ? 0.12 : 1;
         const opacity = secondary && !dimmed ? 0.4 : baseOpacity;
         const strokeWidth = secondary && !onPath ? 1.4 : onPath ? 4 : 2;
-        return {
+        const timelineState = getTimelineRelationshipState(
+          timelineOpen,
+          timelineYear,
+          r,
+        );
+        if (timelineState.hidden) return [];
+
+        const edgeStyle = timelineState.ended
+          ? {
+              stroke: "#9c9a93",
+              strokeWidth: 1.5,
+              opacity: 0.2,
+              strokeDasharray: "6 4",
+            }
+          : {
+              stroke: color,
+              strokeWidth,
+              opacity:
+                timelineState.opacity !== undefined
+                  ? opacity * timelineState.opacity
+                  : opacity,
+            };
+
+        return [{
           id: r.id,
           source: r.source,
           target: r.target,
@@ -330,22 +389,62 @@ export function useGraphView(): GraphView {
             r.direction === "one-way"
               ? { type: MarkerType.ArrowClosed, color }
               : undefined,
-          style: {
-            stroke: color,
-            strokeWidth,
-            opacity,
-          },
+          style: edgeStyle,
           labelStyle: {
             fill: "#1a1d24",
             fontSize: 11,
             fontWeight: 500,
-            opacity: dimmed ? 0.2 : 1,
+            opacity: timelineState.ended ? 0.2 : dimmed ? 0.2 : 1,
           },
-          labelBgStyle: { fill: "#ffffff", opacity: dimmed ? 0.2 : 0.9 },
+          labelBgStyle: {
+            fill: "#ffffff",
+            opacity: timelineState.ended ? 0.2 : dimmed ? 0.2 : 0.9,
+          },
           labelBgPadding: [4, 2] as [number, number],
           labelBgBorderRadius: 4,
-        };
-      });
+        }];
+      })
+      ;
+
+    const presentPersonIds = new Set<string>();
+    for (const edge of edges) {
+      presentPersonIds.add(edge.source);
+      presentPersonIds.add(edge.target);
+    }
+
+    const nodes: Array<PersonNode | CategoryNode> = people.map((person, i) => {
+      const position =
+        treePositions?.[person.id] ??
+        positions[person.id] ??
+        autoLayout(i, people.length);
+      const inFocus = focusSet ? focusSet.has(person.id) : true;
+      const onPath = pathNodeSet.has(person.id);
+      const searchMatch = query.length > 0 && person.name.toLowerCase().includes(query);
+      const timelineDimmed =
+        timelineOpen &&
+        relationships.some(
+          (relationship) =>
+            relationship.source === person.id || relationship.target === person.id,
+        ) &&
+        !presentPersonIds.has(person.id);
+      const dimmed =
+        (focusSet !== null && !inFocus) ||
+        (pathPersonIds.length > 0 && !onPath) ||
+        timelineDimmed;
+      return {
+        id: person.id,
+        type: "person",
+        position,
+        data: {
+          person,
+          dimmed,
+          highlighted: focusPersonId === person.id,
+          onPath,
+          searchMatch,
+          selected: selectedPersonId === person.id,
+        },
+      };
+    });
 
     const radialLabels =
       treeActive && treeRootId && treeShape === "radial" && treeStructure && treePositions
@@ -380,5 +479,7 @@ export function useGraphView(): GraphView {
     layoutMode,
     treeShape,
     treeRootId,
+    timelineOpen,
+    timelineYear,
   ]);
 }

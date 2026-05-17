@@ -11,6 +11,7 @@ export function IntelligenceFeature() {
 
   const people = useGraphStore((s) => s.people);
   const relationships = useGraphStore((s) => s.relationships);
+  const timelineOpen = useGraphStore((s) => s.timelineOpen);
   const focusPersonId = useGraphStore((s) => s.focusPersonId);
   const focusDegrees = useGraphStore((s) => s.focusDegrees);
   const pathPersonIds = useGraphStore((s) => s.pathPersonIds);
@@ -78,6 +79,8 @@ export function IntelligenceFeature() {
     setPathMessage(`Path found with ${path.length - 1} degree(s) of separation.`);
     setPathModalOpen(false);
   };
+
+  if (timelineOpen) return null;
 
   return (
     <>
