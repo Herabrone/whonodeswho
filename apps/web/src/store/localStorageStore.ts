@@ -5,12 +5,16 @@
 import type { PersistedState } from "../types";
 import { EMPTY_STATE, type RelationshipStore } from "./persistence";
 
-const STORAGE_KEY = "relationflow:v1";
-
 export class LocalStorageStore implements RelationshipStore {
+  constructor(private userId: string) {}
+
+  private get key() {
+    return `relationflow:v1:${this.userId}`;
+  }
+
   async load(): Promise<PersistedState> {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(this.key);
       if (!raw) return structuredClone(EMPTY_STATE);
       const parsed = JSON.parse(raw) as PersistedState;
       // Minimal shape guard — never trust persisted data blindly.
@@ -26,7 +30,8 @@ export class LocalStorageStore implements RelationshipStore {
         layout: {
           layoutMode: parsed.layout?.layoutMode ?? EMPTY_STATE.layout.layoutMode,
           treeShape: parsed.layout?.treeShape ?? EMPTY_STATE.layout.treeShape,
-          treeRootId: parsed.layout?.treeRootId ?? EMPTY_STATE.layout.treeRootId,
+          treeRootId:
+            parsed.layout?.treeRootId ?? EMPTY_STATE.layout.treeRootId,
         },
       };
     } catch (err) {
@@ -37,16 +42,18 @@ export class LocalStorageStore implements RelationshipStore {
 
   async save(state: PersistedState): Promise<void> {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(this.key, JSON.stringify(state));
     } catch (err) {
       console.error("[LocalStorageStore] save failed:", err);
     }
   }
 
   async clear(): Promise<void> {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(this.key);
   }
 }
 
-/** Singleton used by the app. Swap this line to change backends. */
-export const persistenceStore: RelationshipStore = new LocalStorageStore();
+/** Factory to create a persistence store for a specific user. */
+export function createPersistenceStore(userId: string): RelationshipStore {
+  return new LocalStorageStore(userId);
+}

@@ -7,6 +7,7 @@
 import type { ReactNode } from "react";
 import { Legend } from "./Legend";
 import { useGraphStore } from "../store/useGraphStore";
+import { useAuth } from "../auth/AuthContext";
 
 interface AppShellProps {
   /** The graph canvas. */
@@ -23,6 +24,8 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
   const setLayoutMode = useGraphStore((s) => s.setLayoutMode);
   const setTreeShape = useGraphStore((s) => s.setTreeShape);
   const setTreeRoot = useGraphStore((s) => s.setTreeRoot);
+
+  const { signOut } = useAuth();
 
   return (
     <div className="flex h-screen w-screen flex-col bg-canvas">
@@ -96,6 +99,12 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
           <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
             Phase 0 · foundation
           </span>
+          <button
+            onClick={signOut}
+            className="text-xs font-medium text-muted hover:text-ink transition-colors"
+          >
+            Sign out
+          </button>
         </div>
       </header>
       <main className="relative flex-1 overflow-hidden">
