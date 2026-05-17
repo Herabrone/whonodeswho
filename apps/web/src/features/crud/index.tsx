@@ -20,7 +20,8 @@ import {
   type OpenRelationshipComposerDetail,
 } from "./relationshipComposerEvent";
 import { YearMonthPicker } from "../timeline/YearMonthPicker";
-import useAutoRelationships, { createRelationshipKey } from "./useAutoRelationships";
+import { validateRelationshipDrafts } from "../../domain/rules/validationRules";
+import { createRelationshipKey, inferAutoRelationships } from "./useAutoRelationships";
 import ConfirmRelationshipsDialog, { ProposalItem } from "./ConfirmRelationshipsDialog";
 
 type ModalState =
@@ -46,6 +47,8 @@ interface RelationshipDraft {
   direction: RelationshipDirection;
   startYear?: number;
   startMonth?: number;
+  endYear?: number;
+  isEnded: boolean;
   color: string;
   notes: string;
 }
@@ -73,6 +76,17 @@ function proposalKey(proposal: Pick<ProposalItem, "source" | "target" | "type">)
   return createRelationshipKey(proposal.source, proposal.target, proposal.type);
 }
 
+function proposalToRelationshipInput(proposal: ProposalItem): RelationshipInput {
+  return {
+    source: proposal.source,
+    target: proposal.target,
+    category: proposal.category,
+    type: proposal.type,
+    direction: proposal.direction,
+    notes: proposal.notes || undefined,
+  };
+}
+
 function initialPersonDraft(person?: Person): PersonDraft {
   return {
     name: person?.name ?? "",
@@ -94,6 +108,8 @@ function initialRelationshipDraft(relationship?: Relationship): RelationshipDraf
     direction: relationship?.direction ?? "two-way",
     startYear: relationship?.startYear,
     startMonth: relationship?.startMonth,
+    endYear: relationship?.endYear,
+    isEnded: relationship?.isActive === false || relationship?.endYear !== undefined,
     color: relationship?.color ?? "",
     notes: relationship?.notes ?? "",
   };
@@ -174,9 +190,11 @@ export function CrudFeature() {
   const [relationshipDraft, setRelationshipDraft] = useState<RelationshipDraft>(initialRelationshipDraft());
   const [relationshipError, setRelationshipError] = useState("");
   const [endConfirmId, setEndConfirmId] = useState<string | null>(null);
+  const [endConfirmYear, setEndConfirmYear] = useState<number>(new Date().getFullYear());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPrimary, setConfirmPrimary] = useState<ProposalItem | null>(null);
   const [confirmProposals, setConfirmProposals] = useState<ProposalItem[]>([]);
+  const [confirmWarnings, setConfirmWarnings] = useState<string[]>([]);
   const [declinedProposalKeys, setDeclinedProposalKeys] = useState<Set<string>>(() => new Set());
 
   const jsonInputRef = useRef<HTMLInputElement | null>(null);
@@ -335,65 +353,77 @@ export function CrudFeature() {
       direction: relationshipDraft.direction,
       startYear: relationshipDraft.startYear,
       startMonth: relationshipDraft.startMonth,
+      endYear: relationshipDraft.isEnded ? relationshipDraft.endYear : undefined,
+      isActive: relationshipDraft.isEnded ? false : true,
       color: relationshipDraft.color || undefined,
       notes: relationshipDraft.notes.trim() || undefined,
     };
+
+    if (
+      payload.startYear !== undefined &&
+      payload.endYear !== undefined &&
+      payload.endYear < payload.startYear
+    ) {
+      setRelationshipError("End year cannot be earlier than the start year.");
+      return;
+    }
 
     if (modal.type === "relationship-edit") {
       updateRelationship(modal.relationship.id, payload);
       closeModal();
     } else {
-      const generatedProposals = useAutoRelationships(
-        payload.type,
-        payload.source,
-        payload.target,
-        payload.category,
-        people,
-        relationships,
-      );
+      const inference = inferAutoRelationships(payload, relationships);
+      const fatalIssues = inference.issues.filter((issue) => issue.severity === "fatal");
+      if (fatalIssues.length > 0) {
+        setRelationshipError(fatalIssues.map((issue) => issue.message).join(" "));
+        return;
+      }
+
+      const generatedProposals = inference.proposals;
       const proposals = generatedProposals.filter(
         (proposal) => !declinedProposalKeys.has(proposalKey(proposal)),
       );
+      const warnings = inference.issues
+        .filter((issue) => issue.severity === "warning")
+        .map((issue) => issue.message);
 
-      if (!proposals || proposals.length === 0) {
-        // No new heuristic suggestions: persist primary relationship immediately.
+      if ((!proposals || proposals.length === 0) && warnings.length === 0) {
         addRelationship(payload);
         closeModal();
       } else {
         setConfirmPrimary(payload as ProposalItem);
         setConfirmProposals(proposals.map((p) => ({ ...p })));
+        setConfirmWarnings(warnings);
         setConfirmOpen(true);
       }
     }
   };
 
   const handleConfirmAddAll = (selected: ProposalItem[], declined: ProposalItem[]) => {
+    const drafts = [
+      ...(confirmPrimary ? [proposalToRelationshipInput(confirmPrimary)] : []),
+      ...selected.map(proposalToRelationshipInput),
+    ];
+    const validationIssues = validateRelationshipDrafts(relationships, drafts);
+    const fatalIssues = validationIssues.filter((issue) => issue.severity === "fatal");
+    if (fatalIssues.length > 0) {
+      const messages = fatalIssues.map((issue) => issue.message);
+      setRelationshipError(messages.join(" "));
+      setConfirmWarnings(messages);
+      return;
+    }
+
     rememberDeclinedProposals(declined);
     if (confirmPrimary) {
-      addRelationship({
-        source: confirmPrimary.source,
-        target: confirmPrimary.target,
-        category: confirmPrimary.category,
-        type: confirmPrimary.type,
-        direction: confirmPrimary.direction,
-        color: undefined,
-        notes: confirmPrimary.notes || undefined,
-      });
+      addRelationship(proposalToRelationshipInput(confirmPrimary));
     }
     for (const p of selected) {
-      addRelationship({
-        source: p.source,
-        target: p.target,
-        category: p.category,
-        type: p.type,
-        direction: p.direction,
-        color: undefined,
-        notes: p.notes || undefined,
-      });
+      addRelationship(proposalToRelationshipInput(p));
     }
     setConfirmOpen(false);
     setConfirmPrimary(null);
     setConfirmProposals([]);
+    setConfirmWarnings([]);
     setModal({ type: "none" });
   };
 
@@ -402,19 +432,12 @@ export function CrudFeature() {
     // which means "just add the primary relationship now". Proposals for future
     // relationships involving these people should still surface normally.
     if (confirmPrimary) {
-      addRelationship({
-        source: confirmPrimary.source,
-        target: confirmPrimary.target,
-        category: confirmPrimary.category,
-        type: confirmPrimary.type,
-        direction: confirmPrimary.direction,
-        color: undefined,
-        notes: confirmPrimary.notes || undefined,
-      });
+      addRelationship(proposalToRelationshipInput(confirmPrimary));
     }
     setConfirmOpen(false);
     setConfirmPrimary(null);
     setConfirmProposals([]);
+    setConfirmWarnings([]);
     setModal({ type: "none" });
   };
 
@@ -423,6 +446,7 @@ export function CrudFeature() {
     setConfirmOpen(false);
     setConfirmPrimary(null);
     setConfirmProposals([]);
+    setConfirmWarnings([]);
   };
 
   const exportJson = () => {
@@ -756,7 +780,10 @@ export function CrudFeature() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setEndConfirmId(selectedRelationship.id)}
+                      onClick={() => {
+                        setEndConfirmId(selectedRelationship.id);
+                        setEndConfirmYear(new Date().getFullYear());
+                      }}
                       className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm text-red-700"
                     >
                       End this relationship
@@ -770,13 +797,32 @@ export function CrudFeature() {
                       {peopleById.get(selectedRelationship.target)?.name ??
                         peopleById.get(selectedRelationship.source)?.name ??
                         "this person"}{" "}
-                      as ended? This sets the end year to {new Date().getFullYear()}.
+                      as ended.
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <label className="text-xs text-red-700">Year ended:</label>
+                      <select
+                        value={endConfirmYear}
+                        onChange={(e) => setEndConfirmYear(Number(e.target.value))}
+                        className="rounded border border-red-300 bg-white px-2 py-0.5 text-xs text-red-800"
+                      >
+                        {Array.from(
+                          { length: new Date().getFullYear() - (selectedRelationship.startYear ?? 1900) + 1 },
+                          (_, i) => (selectedRelationship.startYear ?? 1900) + i,
+                        )
+                          .reverse()
+                          .map((y) => (
+                            <option key={y} value={y}>
+                              {y}
+                            </option>
+                          ))}
+                      </select>
                     </div>
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
                         onClick={() => {
-                          endRelationship(selectedRelationship.id);
+                          endRelationship(selectedRelationship.id, endConfirmYear);
                           setEndConfirmId(null);
                         }}
                         className="rounded border border-red-400 bg-red-600 px-2.5 py-1 text-xs font-medium text-white"
@@ -1039,16 +1085,35 @@ export function CrudFeature() {
               <YearMonthPicker
                 startYear={relationshipDraft.startYear}
                 startMonth={relationshipDraft.startMonth}
+                endYear={relationshipDraft.endYear}
+                isEnded={relationshipDraft.isEnded}
                 onYearChange={(startYear) =>
                   setRelationshipDraft((draft) => ({
                     ...draft,
                     startYear,
+                    endYear:
+                      draft.endYear !== undefined && startYear !== undefined && draft.endYear < startYear
+                        ? startYear
+                        : draft.endYear,
                   }))
                 }
                 onMonthChange={(startMonth) =>
                   setRelationshipDraft((draft) => ({
                     ...draft,
                     startMonth,
+                  }))
+                }
+                onEndedChange={(isEnded) =>
+                  setRelationshipDraft((draft) => ({
+                    ...draft,
+                    isEnded,
+                    endYear: isEnded ? draft.endYear ?? draft.startYear ?? new Date().getFullYear() : undefined,
+                  }))
+                }
+                onEndYearChange={(endYear) =>
+                  setRelationshipDraft((draft) => ({
+                    ...draft,
+                    endYear,
                   }))
                 }
               />
@@ -1201,6 +1266,7 @@ export function CrudFeature() {
           open={confirmOpen}
           primary={confirmPrimary}
           proposals={confirmProposals}
+          warnings={confirmWarnings}
           people={people}
           onCancel={handleCancelConfirm}
           onAddAll={handleConfirmAddAll}

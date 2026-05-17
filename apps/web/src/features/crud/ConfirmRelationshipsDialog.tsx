@@ -17,6 +17,9 @@ export interface ProposalItem {
   rule?: string;
   reason?: string;
   confidence?: ProposalConfidence;
+  prechecked?: boolean;
+  ruleId?: string;
+  derivationDepth?: number;
   checked?: boolean;
 }
 
@@ -24,6 +27,7 @@ interface Props {
   open: boolean;
   primary: ProposalItem;
   proposals: ProposalItem[];
+  warnings?: string[];
   people: Person[];
   onCancel: () => void;
   onAddAll: (selected: ProposalItem[], declined: ProposalItem[]) => void;
@@ -39,6 +43,7 @@ export function ConfirmRelationshipsDialog({
   open,
   primary,
   proposals,
+  warnings = [],
   people,
   onCancel,
   onAddAll,
@@ -48,12 +53,20 @@ export function ConfirmRelationshipsDialog({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    // Only High-confidence proposals are preselected; Medium and Low start unchecked.
-    setLocal(proposals.map((p) => ({ ...p, checked: p.confidence === "High" || p.confidence === undefined })));
+    setLocal(
+      proposals.map((p) => ({
+        ...p,
+        checked: p.checked ?? p.prechecked ?? (p.confidence === "High" || p.confidence === undefined),
+      })),
+    );
   }, [proposals]);
 
   const toggleChecked = (i: number) => {
     setLocal((prev) => prev.map((p, idx) => (idx === i ? { ...p, checked: !p.checked } : p)));
+  };
+
+  const setAllChecked = (checked: boolean) => {
+    setLocal((prev) => prev.map((p) => ({ ...p, checked })));
   };
 
   const applyEdit = (i: number, updated: Partial<ProposalItem>) => {
@@ -62,18 +75,19 @@ export function ConfirmRelationshipsDialog({
 
   const selected = useMemo(() => local.filter((p) => p.checked), [local]);
   const declined = useMemo(() => local.filter((p) => !p.checked), [local]);
+  const allSelected = local.length > 0 && selected.length === local.length;
 
   if (!open) return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-      <div className="w-[720px] max-w-full rounded-xl border border-line bg-panel p-4 shadow-xl">
-        <h3 className="mb-1 text-lg font-semibold text-ink">Review Heuristic Suggestions</h3>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="max-h-[calc(100vh-2rem)] w-[720px] max-w-full overflow-y-auto rounded-xl border border-line bg-white p-5 text-ink shadow-2xl dark:bg-panel">
+        <h3 className="mb-1 text-lg font-semibold text-ink">Review Relationship Suggestions</h3>
         <p className="mb-3 text-sm text-muted">Uncheck any suggestion you want to decline for the rest of this session.</p>
 
         <div className="mb-3">
           <div className="mb-1 text-sm text-muted">Primary relationship</div>
-          <div className="rounded border border-line bg-canvas p-3">
+          <div className="rounded border border-line bg-canvas p-3 dark:bg-canvas">
             <strong>{nameFor(primary.source, people)}</strong>
             <span className="mx-2">→</span>
             <strong>{nameFor(primary.target, people)}</strong>
@@ -81,15 +95,42 @@ export function ConfirmRelationshipsDialog({
           </div>
         </div>
 
+        {warnings.length > 0 ? (
+          <div className="mb-3 rounded border border-yellow-300 bg-yellow-50 p-3 text-xs text-yellow-900 dark:border-yellow-900/50 dark:bg-yellow-900/20 dark:text-yellow-200">
+            {warnings.map((warning, index) => (
+              <div key={`${warning}-${index}`}>{warning}</div>
+            ))}
+          </div>
+        ) : null}
+
         <div className="mb-4">
-          <div className="mb-2 text-sm text-muted">Heuristic suggestions</div>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-sm text-muted">Relationship suggestions</div>
+            {local.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setAllChecked(!allSelected)}
+                className="rounded border border-line bg-canvas px-2.5 py-1 text-xs font-medium text-ink hover:bg-panel"
+              >
+                {allSelected ? "Clear All" : "Select All"}
+              </button>
+            ) : null}
+          </div>
           {local.length === 0 ? (
             <div className="text-xs text-muted">No proposals — confirm primary relationship below.</div>
           ) : (
             <ul className="space-y-2">
               {local.map((p, i) => (
-                <li key={`${p.source}-${p.target}-${p.type}-${i}`} className="flex items-start gap-3">
-                  <input type="checkbox" checked={!!p.checked} onChange={() => toggleChecked(i)} />
+                <li
+                  key={`${p.source}-${p.target}-${p.ruleId ?? "proposal"}-${i}`}
+                  className="flex items-start gap-3 rounded border border-line bg-canvas p-3 dark:bg-canvas"
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!p.checked}
+                    onChange={() => toggleChecked(i)}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <div className="text-sm">
@@ -178,9 +219,9 @@ export function ConfirmRelationshipsDialog({
           </button>
           <button
             onClick={() => onAddAll(selected, declined)}
-            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white"
+            className="rounded-lg border border-line bg-canvas px-4 py-1.5 text-sm font-semibold text-black shadow-sm hover:bg-panel dark:bg-panel dark:text-white"
           >
-            Add All
+            Add Selected
           </button>
         </div>
       </div>

@@ -96,24 +96,16 @@ describe("parent/child rules", () => {
         source: "kid2",
         target: "kid1",
         type: "sibling",
-        confidence: "High",
+        confidence: "Medium",
         rule: "Shared Parent -> Sibling",
       }),
     );
   });
 
-  it("proposes parent for parent's spouse", () => {
+  it("does not infer a co-parent from a parent's spouse", () => {
     const rels = [r("mom", "dad", "spouse", "romantic", "two-way")];
     const proposals = run("parent", "dad", "kid", rels);
-    expect(proposals).toContainEqual(
-      expect.objectContaining({
-        source: "mom",
-        target: "kid",
-        type: "parent",
-        confidence: "High",
-        rule: "Parent's Spouse -> Other Parent",
-      }),
-    );
+    expect(types(proposals)).not.toContain("mom->kid:parent");
   });
 
   it("proposes aunt/uncle for parent's siblings", () => {
@@ -124,7 +116,7 @@ describe("parent/child rules", () => {
         source: "uncle",
         target: "kid",
         type: "aunt/uncle",
-        confidence: "High",
+        confidence: "Medium",
         rule: "Parent's Sibling -> Aunt/Uncle",
       }),
     );
@@ -154,7 +146,7 @@ describe("sibling rules", () => {
         source: "mom",
         target: "B",
         type: "parent",
-        confidence: "High",
+        confidence: "Medium",
         rule: "Sibling's Parent -> Shared Parent",
       }),
     );
@@ -170,7 +162,7 @@ describe("sibling rules", () => {
         source: "mom",
         target: "B",
         type: "parent",
-        confidence: "High",
+        confidence: "Medium",
         rule: "Sibling's Parent -> Shared Parent",
       }),
     );
@@ -184,7 +176,7 @@ describe("sibling rules", () => {
         source: "B",
         target: "C",
         type: "sibling",
-        confidence: "High",
+        confidence: "Medium",
         rule: "Shared Sibling -> Also Sibling",
       }),
     );
@@ -198,7 +190,7 @@ describe("sibling rules", () => {
         source: "B",
         target: "child1",
         type: "aunt/uncle",
-        confidence: "High",
+        confidence: "Medium",
         rule: "Parent's Sibling -> Aunt/Uncle",
       }),
     );
@@ -244,7 +236,7 @@ describe("grandparent/grandchild rules", () => {
         source: "gc1",
         target: "gc2",
         type: "cousin",
-        confidence: "High",
+        confidence: "Medium",
         rule: "Shared Grandparent -> Cousin",
       }),
     );
@@ -288,7 +280,7 @@ describe("manager rules", () => {
         source: "emp1",
         target: "emp2",
         type: "coworker",
-        confidence: "High",
+        confidence: "Medium",
         rule: "Shared Manager -> Coworker",
       }),
     );
@@ -341,10 +333,10 @@ describe("proposal keys", () => {
 });
 
 describe("alias normalization", () => {
-  it("treats partner as spouse for inference", () => {
-    const rels = [r("A", "B", "partner", "romantic", "two-way")];
-    const proposals = run("parent", "A", "kid", rels);
-    expect(types(proposals)).toContain("B->kid:parent");
+  it("treats partner as spouse for in-law inference", () => {
+    const rels = [r("parent", "A", "parent")];
+    const proposals = run("partner", "A", "B", rels);
+    expect(types(proposals)).toContain("parent->B:parent-in-law");
   });
 
   it("legacy parent/child combined type fires parent rules", () => {
