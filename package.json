@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\"",
+    "ops:build": "node ops/build.mjs",
     "dev:web": "npm run dev --workspace @relationflow/web",
     "dev:api": "npm run start:dev --workspace @relationflow/api",
     "build": "npm run build:web",

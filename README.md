@@ -17,7 +17,14 @@ npm run build:web  # frontend production build
 npm run build:api  # backend production build
 npm run typecheck  # frontend typecheck
 npm test           # frontend vitest suite
+./ops/build dev    # orchestrated local run (web on http://localhost:3005)
+./ops/build prod   # orchestrated production-style run (web on http://localhost:3005)
 ```
+
+The `build` wrapper script handles startup orchestration for both modes:
+- forces frontend to use port `3005`
+- checks required ports and stops existing processes on those ports
+- waits for API (`/health`) and frontend HTTP health checks before reporting ready
 
 ## Local backend
 
