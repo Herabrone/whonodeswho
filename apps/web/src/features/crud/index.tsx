@@ -188,6 +188,7 @@ export function CrudFeature() {
   const jsonInputRef = useRef<HTMLInputElement | null>(null);
   const csvPeopleInputRef = useRef<HTMLInputElement | null>(null);
   const csvRelationshipsInputRef = useRef<HTMLInputElement | null>(null);
+  const personNameRef = useRef<HTMLInputElement | null>(null);
 
   const people = useGraphStore((s) => s.people);
   const relationships = useGraphStore((s) => s.relationships);
@@ -291,6 +292,17 @@ export function CrudFeature() {
     setRelationshipError("");
     setEndConfirmId(null);
   };
+
+  useEffect(() => {
+    if (modal.type === "person-create") {
+      // focus and select the name input when opening the Add Person modal
+      // use a microtask to ensure the input is mounted
+      setTimeout(() => {
+        personNameRef.current?.focus();
+        personNameRef.current?.select();
+      }, 0);
+    }
+  }, [modal.type]);
 
   const rememberDeclinedProposals = (proposals: ProposalItem[]) => {
     if (proposals.length === 0) return;
@@ -842,6 +854,7 @@ export function CrudFeature() {
               <label className="block text-sm text-rf-text">
                 Name
                 <input
+                  ref={personNameRef}
                   value={personDraft.name}
                   onChange={(e) => setPersonDraft((d) => ({ ...d, name: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"

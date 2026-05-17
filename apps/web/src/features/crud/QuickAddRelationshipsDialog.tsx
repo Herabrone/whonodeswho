@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Person, Relationship, RelationshipInput } from "../../types";
+import type { Person, RelationshipInput } from "../../types";
 import { CATEGORIES, RELATIONSHIP_CATALOG } from "../../constants";
 import { useGraphStore } from "../../store/useGraphStore";
 import useAutoRelationships from "./useAutoRelationships";
