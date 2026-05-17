@@ -1,19 +1,18 @@
-import { useMemo } from "react";
 import { CATEGORY_UI_COLORS } from "../../constants";
 import { useGraphStore } from "../../store/useGraphStore";
+import type { TimelineEpisodeMarker } from "../../domain/timeline/threadEpisodes";
 
 interface TimelineScrubberProps {
   minYear: number;
   maxYear: number;
+  markers: TimelineEpisodeMarker[];
 }
 
 function toPercent(year: number, minYear: number, maxYear: number) {
   return `${((year - minYear) / (maxYear - minYear)) * 100}%`;
 }
 
-export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
-  const relationships = useGraphStore((s) => s.relationships);
-  const people = useGraphStore((s) => s.people);
+export function TimelineScrubber({ minYear, maxYear, markers }: TimelineScrubberProps) {
   const timelinePlaying = useGraphStore((s) => s.timelinePlaying);
   const timelineSpeed = useGraphStore((s) => s.timelineSpeed);
   const timelineYear = useGraphStore((s) => s.timelineYear);
@@ -21,40 +20,6 @@ export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
   const setTimelinePlaying = useGraphStore((s) => s.setTimelinePlaying);
   const setTimelineSpeed = useGraphStore((s) => s.setTimelineSpeed);
   const closeTimeline = useGraphStore((s) => s.closeTimeline);
-
-  const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
-  const events = relationships.flatMap((relationship) => {
-    const personName =
-      peopleById.get(relationship.target)?.name ??
-      peopleById.get(relationship.source)?.name ??
-      "Unknown";
-    const items: Array<{
-      id: string;
-      year: number;
-      category: keyof typeof CATEGORY_UI_COLORS;
-      title: string;
-    }> = [];
-
-    if (relationship.startYear !== undefined) {
-      items.push({
-        id: `${relationship.id}:start`,
-        year: relationship.startYear,
-        category: relationship.category,
-        title: `${relationship.startYear} - ${personName} (${relationship.type} started)`,
-      });
-    }
-
-    if (relationship.endYear !== undefined) {
-      items.push({
-        id: `${relationship.id}:end`,
-        year: relationship.endYear,
-        category: relationship.category,
-        title: `${relationship.endYear} - ${personName} (${relationship.type} ended)`,
-      });
-    }
-
-    return items;
-  });
 
   return (
     <div className="flex items-center gap-3 pt-4">
@@ -78,7 +43,26 @@ export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
           style={{ accentColor: "var(--rf-accent)" }}
         />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-3">
-          {events.map((event) => {
+          {markers.flatMap((marker) => {
+            const items = [
+              {
+                id: `${marker.id}:start`,
+                year: marker.startYear,
+                category: marker.category,
+                title: `${marker.startYear} - ${marker.label} started`,
+              },
+              ...(marker.endYear !== undefined
+                ? [{
+                    id: `${marker.id}:end`,
+                    year: marker.endYear,
+                    category: marker.category,
+                    title: `${marker.endYear} - ${marker.label} ended`,
+                  }]
+                : []),
+            ];
+
+            return items;
+          }).map((event) => {
             return (
               <span
                 key={event.id}

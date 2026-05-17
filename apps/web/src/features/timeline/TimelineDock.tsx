@@ -1,9 +1,9 @@
 import { useMemo } from "react";
+import { selectTimelineData } from "../../domain/timeline";
 import { useGraphStore } from "../../store/useGraphStore";
-import { LifespanBars } from "./LifespanBars";
 import { TimelineScrubber } from "./TimelineScrubber";
+import { TimelineRelationshipBars } from "./TimelineRelationshipBars";
 import { useTimelinePlayback } from "./useTimelinePlayback";
-import { getTimelineRange } from "./lib/timeline.utils";
 
 export function TimelineDock() {
   const timelineOpen = useGraphStore((s) => s.timelineOpen);
@@ -12,12 +12,14 @@ export function TimelineDock() {
   const timelineYear = useGraphStore((s) => s.timelineYear);
   const closeTimeline = useGraphStore((s) => s.closeTimeline);
 
-  const range = useMemo(() => getTimelineRange(relationships), [relationships]);
-  const datedRelationships = relationships.filter((r) => r.startYear !== undefined);
+  const timelineData = useMemo(
+    () => selectTimelineData({ people, relationships }),
+    [people, relationships],
+  );
 
   useTimelinePlayback();
 
-  if (!range) return null;
+  if (!timelineData.range) return null;
 
   return (
     <div
@@ -30,7 +32,9 @@ export function TimelineDock() {
         background: "var(--rf-bg-surface)",
         borderTop: "1px solid var(--rf-border-default)",
         boxShadow: "var(--rf-shadow-top-dock)",
-        padding: "12px 16px",
+        padding: "12px 16px 16px",
+        height: 260,
+        overflow: "hidden",
         transform: timelineOpen ? "translateY(0)" : "translateY(100%)",
         transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
       }}
@@ -51,19 +55,26 @@ export function TimelineDock() {
         </button>
       </div>
 
-      <TimelineScrubber minYear={range.min} maxYear={range.max + 1} />
-      {datedRelationships.length < 2 ? (
+      <TimelineScrubber
+        minYear={timelineData.range.min}
+        maxYear={timelineData.range.max + 1}
+        markers={timelineData.markers}
+      />
+      {timelineData.episodes.length === 0 ? (
         <div className="mt-4 text-sm text-rf-muted">
-          Add a "Year started" to at least two relationships to see changes over time.
+          Add a dated relationship phase to see it appear on the timeline.
         </div>
       ) : (
-        <LifespanBars
-          relationships={datedRelationships}
-          people={people}
-          currentYear={timelineYear}
-          minYear={range.min}
-          maxYear={range.max + 1}
-        />
+        <div className="mt-4 h-[164px] overflow-auto rounded-xl border border-rf-border bg-rf-base/35">
+          <TimelineRelationshipBars
+            threads={timelineData.threads}
+            episodesByThread={timelineData.episodesByThread}
+            people={people}
+            currentYear={timelineYear}
+            minYear={timelineData.range.min}
+            maxYear={timelineData.range.max + 1}
+          />
+        </div>
       )}
     </div>
   );
