@@ -10,9 +10,10 @@ export function TimelineDock() {
   const relationships = useGraphStore((s) => s.relationships);
   const people = useGraphStore((s) => s.people);
   const timelineYear = useGraphStore((s) => s.timelineYear);
+  const closeTimeline = useGraphStore((s) => s.closeTimeline);
 
   const range = useMemo(() => getTimelineRange(relationships), [relationships]);
-  const datedRelationships = relationships.filter((relationship) => relationship.startYear !== undefined);
+  const datedRelationships = relationships.filter((r) => r.startYear !== undefined);
 
   useTimelinePlayback();
 
@@ -34,10 +35,26 @@ export function TimelineDock() {
         transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
       }}
     >
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-rf-text">Relationship timeline</div>
+          <div className="text-xs text-rf-muted">
+            Move the slider to see active and ended relationships update on the graph.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={closeTimeline}
+          className="rounded-full border border-rf-border bg-rf-subtle px-3 py-1 text-sm text-rf-muted hover:text-rf-text"
+        >
+          Hide
+        </button>
+      </div>
+
       <TimelineScrubber minYear={range.min} maxYear={range.max + 1} />
       {datedRelationships.length < 2 ? (
         <div className="mt-4 text-sm text-rf-muted">
-          Add a “Year started” to your relationships to enable the timeline.
+          Add a "Year started" to at least two relationships to see changes over time.
         </div>
       ) : (
         <LifespanBars

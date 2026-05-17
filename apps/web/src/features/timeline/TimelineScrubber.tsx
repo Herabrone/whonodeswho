@@ -23,7 +23,38 @@ export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
   const closeTimeline = useGraphStore((s) => s.closeTimeline);
 
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
-  const events = relationships.filter((relationship) => relationship.startYear !== undefined);
+  const events = relationships.flatMap((relationship) => {
+    const personName =
+      peopleById.get(relationship.target)?.name ??
+      peopleById.get(relationship.source)?.name ??
+      "Unknown";
+    const items: Array<{
+      id: string;
+      year: number;
+      category: keyof typeof CATEGORY_UI_COLORS;
+      title: string;
+    }> = [];
+
+    if (relationship.startYear !== undefined) {
+      items.push({
+        id: `${relationship.id}:start`,
+        year: relationship.startYear,
+        category: relationship.category,
+        title: `${relationship.startYear} - ${personName} (${relationship.type} started)`,
+      });
+    }
+
+    if (relationship.endYear !== undefined) {
+      items.push({
+        id: `${relationship.id}:end`,
+        year: relationship.endYear,
+        category: relationship.category,
+        title: `${relationship.endYear} - ${personName} (${relationship.type} ended)`,
+      });
+    }
+
+    return items;
+  });
 
   return (
     <div className="flex items-center gap-3 pt-4">
@@ -47,24 +78,20 @@ export function TimelineScrubber({ minYear, maxYear }: TimelineScrubberProps) {
           style={{ accentColor: "var(--rf-accent)" }}
         />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-3">
-          {events.map((relationship) => {
-            const personName =
-              peopleById.get(relationship.target)?.name ??
-              peopleById.get(relationship.source)?.name ??
-              "Unknown";
+          {events.map((event) => {
             return (
               <span
-                key={relationship.id}
-                title={`${relationship.startYear} - ${personName} (${relationship.type})`}
+                key={event.id}
+                title={event.title}
                 style={{
                   position: "absolute",
-                  left: toPercent(relationship.startYear!, minYear, maxYear),
+                  left: toPercent(event.year, minYear, maxYear),
                   top: 0,
                   width: 8,
                   height: 8,
                   transform: "translate(-50%, 0)",
                   borderRadius: "999px",
-                  backgroundColor: CATEGORY_UI_COLORS[relationship.category],
+                  backgroundColor: CATEGORY_UI_COLORS[event.category],
                   boxShadow: "0 0 0 2px var(--rf-bg-surface)",
                 }}
               />
