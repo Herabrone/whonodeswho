@@ -23,7 +23,7 @@ export const EMPTY_STATE: PersistedState = {
   positions: {},
   layout: {
     layoutMode: "free",
-    treeShape: "radial",
+    treeShape: "grouped",
     treeRootId: null,
   },
 };

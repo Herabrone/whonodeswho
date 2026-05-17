@@ -20,16 +20,17 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { PersonNode } from "./PersonNode";
-import { useGraphView, type PersonNode as PersonNodeType } from "./useGraphView";
+import { useGraphView } from "./useGraphView";
 import { useGraphStore } from "../store/useGraphStore";
 import { FloatingEdge } from "./FloatingEdge";
 import { dispatchOpenRelationshipComposer } from "../features/crud/relationshipComposerEvent";
+import { CategoryNode } from "./CategoryNode";
 
-const nodeTypes = { person: PersonNode };
+const nodeTypes = { person: PersonNode, category: CategoryNode };
 const edgeTypes = { relationship: FloatingEdge };
 
 export function GraphCanvas() {
-  const { nodes, edges, radialLabels } = useGraphView();
+  const { nodes, edges, radialLabels, groupedDivider } = useGraphView();
   const { fitView } = useReactFlow();
   const setPosition = useGraphStore((s) => s.setPosition);
   const selectPerson = useGraphStore((s) => s.selectPerson);
@@ -43,7 +44,7 @@ export function GraphCanvas() {
 
   // Commit drag positions straight to the store; the derived nodes react.
   const onNodesChange = useCallback(
-    (changes: NodeChange<PersonNodeType>[]) => {
+    (changes: NodeChange[]) => {
       for (const change of changes) {
         if (change.type === "position" && change.position) {
           setPosition(change.id, change.position);
@@ -53,18 +54,35 @@ export function GraphCanvas() {
     [setPosition],
   );
 
-  const onNodeClick = useCallback<NodeMouseHandler<PersonNodeType>>(
+  const onNodeClick = useCallback<NodeMouseHandler>(
     (_, node) => {
-      selectPerson(node.id);
+      const personId =
+        typeof node.data === "object" && node.data !== null
+          ? (node.data as { person?: { id?: string } }).person?.id
+          : undefined;
+
+      if (!personId) return;
+
+      selectPerson(personId);
       if (layoutMode === "tree") {
-        setTreeRoot(node.id);
+        setTreeRoot(personId);
+        requestAnimationFrame(() => {
+          void fitView({ padding: 0.25, duration: 220 });
+        });
       }
     },
-    [layoutMode, selectPerson, setTreeRoot],
+    [fitView, layoutMode, selectPerson, setTreeRoot],
   );
 
-  const onNodeDoubleClick = useCallback<NodeMouseHandler<PersonNodeType>>(
-    (_, node) => setFocus(node.id),
+  const onNodeDoubleClick = useCallback<NodeMouseHandler>(
+    (_, node) => {
+      const personId =
+        typeof node.data === "object" && node.data !== null
+          ? (node.data as { person?: { id?: string } }).person?.id
+          : undefined;
+      if (!personId) return;
+      setFocus(personId);
+    },
     [setFocus],
   );
 
@@ -114,6 +132,18 @@ export function GraphCanvas() {
       <Controls showInteractive={false} />
       <MiniMap pannable zoomable nodeColor="#c3c1ba" maskColor="rgba(244,243,239,0.7)" />
       <ViewportPortal>
+        {layoutMode === "tree" && treeShape === "grouped" && groupedDivider ? (
+          <div
+            style={{
+              position: "absolute",
+              transform: `translate(${groupedDivider.x}px, ${groupedDivider.yTop}px)`,
+              width: 0,
+              height: groupedDivider.yBottom - groupedDivider.yTop,
+              borderLeft: "2px dashed rgba(134, 142, 150, 0.65)",
+              pointerEvents: "none",
+            }}
+          />
+        ) : null}
         {layoutMode === "tree" && treeShape === "radial"
           ? radialLabels.map((item) => (
               <div

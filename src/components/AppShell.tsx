@@ -19,8 +19,10 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
   const layoutMode = useGraphStore((s) => s.layoutMode);
   const treeShape = useGraphStore((s) => s.treeShape);
   const treeRootId = useGraphStore((s) => s.treeRootId);
+  const selectedPersonId = useGraphStore((s) => s.selectedPersonId);
   const setLayoutMode = useGraphStore((s) => s.setLayoutMode);
   const setTreeShape = useGraphStore((s) => s.setTreeShape);
+  const setTreeRoot = useGraphStore((s) => s.setTreeRoot);
 
   return (
     <div className="flex h-screen w-screen flex-col bg-canvas">
@@ -49,13 +51,28 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
               className={`rounded-full px-3 py-1 font-medium transition-colors ${
                 layoutMode === "tree" ? "bg-panel text-ink" : "text-muted"
               }`}
-              onClick={() => setLayoutMode("tree")}
+              onClick={() => {
+                setLayoutMode("tree");
+                if (selectedPersonId) setTreeRoot(selectedPersonId);
+              }}
             >
               Tree
             </button>
           </div>
           {layoutMode === "tree" ? (
             <div className="inline-flex rounded-full border border-line bg-canvas p-0.5 text-xs">
+              <button
+                type="button"
+                className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                  treeShape === "grouped" ? "bg-panel text-ink" : "text-muted"
+                }`}
+                onClick={() => {
+                  setTreeShape("grouped");
+                  if (selectedPersonId) setTreeRoot(selectedPersonId);
+                }}
+              >
+                Grouped
+              </button>
               <button
                 type="button"
                 className={`rounded-full px-3 py-1 font-medium transition-colors ${

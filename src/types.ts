@@ -72,7 +72,7 @@ export interface PersistedState {
 /** Focus-mode depth. Owned (written) by Track B; read by Phase 0's graph view. */
 export type FocusDegrees = 1 | 2 | 3 | "all";
 export type LayoutMode = "free" | "tree";
-export type TreeShape = "radial" | "layered";
+export type TreeShape = "radial" | "layered" | "grouped";
 
 /**
  * Payloads for create operations. Store actions generate id/createdAt/updatedAt.

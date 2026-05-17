@@ -9,7 +9,7 @@
 import { useMemo } from "react";
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
 import type { Person, RelationshipCategory, XYPosition } from "../types";
-import { CATEGORIES, WEAK_RELATIONSHIP_TYPES } from "../constants";
+import { CATEGORIES, CATEGORY_COLORS, WEAK_RELATIONSHIP_TYPES } from "../constants";
 import { useGraphStore } from "../store/useGraphStore";
 import { autoLayout, buildAdjacency, getNodesWithinDegrees } from "../lib/graph";
 import {
@@ -18,6 +18,8 @@ import {
   computeTreeLayout,
   isTreePrimaryEdge,
 } from "./layout";
+import { computeCategoryTree } from "./treeLayout";
+import type { CategoryNodeData } from "./CategoryNode";
 
 export interface PersonNodeData extends Record<string, unknown> {
   person: Person;
@@ -29,9 +31,10 @@ export interface PersonNodeData extends Record<string, unknown> {
 }
 
 export type PersonNode = Node<PersonNodeData, "person">;
+export type CategoryNode = Node<CategoryNodeData, "category">;
 
 export interface GraphView {
-  nodes: PersonNode[];
+  nodes: Array<PersonNode | CategoryNode>;
   edges: Edge[];
   radialLabels: Array<{
     category: RelationshipCategory;
@@ -39,6 +42,7 @@ export interface GraphView {
     color: string;
     position: XYPosition;
   }>;
+  groupedDivider: { x: number; yTop: number; yBottom: number } | null;
 }
 
 export function useGraphView(): GraphView {
@@ -61,6 +65,7 @@ export function useGraphView(): GraphView {
 
   return useMemo<GraphView>(() => {
     const graph = { people, relationships };
+    const peopleById = new Map(people.map((person) => [person.id, person]));
     const adj = buildAdjacency(graph);
 
     // Focus set: people within N degrees of the focused person.
@@ -85,17 +90,181 @@ export function useGraphView(): GraphView {
 
     const treeActive =
       layoutMode === "tree" && treeRootId !== null && people.some((p) => p.id === treeRootId);
+    const groupedTreeActive = treeActive && treeShape === "grouped";
+
+    if (groupedTreeActive && treeRootId) {
+      const layout = computeCategoryTree(graph, treeRootId);
+      const query = searchQuery.trim().toLowerCase();
+
+      const nodes: Array<PersonNode | CategoryNode> = [];
+      const root = peopleById.get(treeRootId);
+
+      if (root) {
+        nodes.push({
+          id: root.id,
+          type: "person",
+          position: layout.personPositions[root.id] ?? positions[root.id] ?? autoLayout(0, people.length),
+          data: {
+            person: root,
+            dimmed: false,
+            highlighted: focusPersonId === root.id,
+            onPath: false,
+            searchMatch: query.length > 0 && root.name.toLowerCase().includes(query),
+            selected: selectedPersonId === root.id,
+          },
+        });
+      }
+
+      for (const categoryNode of layout.categoryNodes) {
+        nodes.push({
+          id: categoryNode.id,
+          type: "category",
+          position: categoryNode.position,
+          data: {
+            category: categoryNode.category,
+            label: categoryNode.label,
+          },
+          draggable: false,
+          selectable: false,
+        });
+      }
+
+      const connectedNodeIds = new Set<string>([treeRootId]);
+
+      for (const edge of layout.personEdges) {
+        const prefix = `tree-${edge.category}-`;
+        const personId = edge.target.startsWith(prefix)
+          ? edge.target.slice(prefix.length)
+          : edge.target;
+        const person = peopleById.get(personId);
+        if (!person) continue;
+        if (connectedNodeIds.has(edge.target)) continue;
+
+        connectedNodeIds.add(edge.target);
+
+        nodes.push({
+          id: edge.target,
+          type: "person",
+          position: layout.personPositions[edge.target],
+          data: {
+            person,
+            dimmed: false,
+            highlighted: false,
+            onPath: false,
+            searchMatch: query.length > 0 && person.name.toLowerCase().includes(query),
+            selected: selectedPersonId === person.id,
+          },
+        });
+      }
+
+      for (const personId of layout.disconnectedIds) {
+        const person = peopleById.get(personId);
+        if (!person) continue;
+
+        nodes.push({
+          id: person.id,
+          type: "person",
+          position:
+            layout.personPositions[person.id] ?? positions[person.id] ?? autoLayout(0, people.length),
+          data: {
+            person,
+            dimmed: true,
+            highlighted: false,
+            onPath: false,
+            searchMatch: query.length > 0 && person.name.toLowerCase().includes(query),
+            selected: selectedPersonId === person.id,
+          },
+        });
+      }
+
+      const edges: Edge[] = [
+        ...layout.categoryEdges.map((edge) => {
+          const color = CATEGORY_COLORS[edge.category];
+          return {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            type: "relationship",
+            data: {
+              layoutMode,
+              treeShape,
+            },
+            style: {
+              stroke: color,
+              strokeWidth: 1.5,
+              opacity: 0.4,
+            },
+          } satisfies Edge;
+        }),
+        ...layout.personEdges.map((edge) => {
+          const color = CATEGORY_COLORS[edge.category];
+          return {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            type: "relationship",
+            label: edge.relationshipType,
+            data: {
+              layoutMode,
+              treeShape,
+            },
+            style: {
+              stroke: color,
+              strokeWidth: 1.5,
+              opacity: 1,
+            },
+            labelStyle: {
+              fill: "#1a1d24",
+              fontSize: 11,
+              fontWeight: 500,
+              opacity: 1,
+            },
+            labelBgStyle: { fill: "#ffffff", opacity: 0.9 },
+            labelBgPadding: [4, 2] as [number, number],
+            labelBgBorderRadius: 4,
+          } satisfies Edge;
+        }),
+      ];
+
+      let groupedDivider: GraphView["groupedDivider"] = null;
+      if (layout.disconnectedIds.length > 0) {
+        const xValues = layout.disconnectedIds
+          .map((id) => layout.personPositions[id]?.x)
+          .filter((x): x is number => typeof x === "number");
+        const yValues = layout.disconnectedIds
+          .map((id) => layout.personPositions[id]?.y)
+          .filter((y): y is number => typeof y === "number");
+
+        if (xValues.length > 0 && yValues.length > 0) {
+          const minX = Math.min(...xValues);
+          const minY = Math.min(...yValues);
+          const maxY = Math.max(...yValues);
+          groupedDivider = {
+            x: minX - 24,
+            yTop: minY - 18,
+            yBottom: maxY + 54,
+          };
+        }
+      }
+
+      return {
+        nodes,
+        edges,
+        radialLabels: [],
+        groupedDivider,
+      };
+    }
 
     const treeStructure = treeActive ? buildTreeStructure(graph, treeRootId!) : null;
     const treePositions =
-      treeActive && treeRootId
+      treeActive && treeRootId && treeShape !== "grouped"
         ? computeTreeLayout(graph, treeRootId, treeShape)
         : null;
 
     const query = searchQuery.trim().toLowerCase();
     const visible = new Set(visibleCategories);
 
-    const nodes: PersonNode[] = people.map((person, i) => {
+    const nodes: Array<PersonNode | CategoryNode> = people.map((person, i) => {
       const position =
         treePositions?.[person.id] ??
         positions[person.id] ??
@@ -189,7 +358,7 @@ export function useGraphView(): GraphView {
       radialLabels.filter((label) => label.category === category),
     );
 
-    return { nodes, edges, radialLabels: sortedLabels };
+    return { nodes, edges, radialLabels: sortedLabels, groupedDivider: null };
   }, [
     people,
     relationships,

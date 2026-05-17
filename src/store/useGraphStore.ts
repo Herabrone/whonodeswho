@@ -171,7 +171,7 @@ const LEGEND_DEFAULTS = {
 
 const LAYOUT_DEFAULTS: LayoutSlice = {
   layoutMode: "free",
-  treeShape: "radial",
+  treeShape: "grouped",
   treeRootId: null,
 };
 
