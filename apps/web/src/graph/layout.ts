@@ -8,6 +8,7 @@ export const CATEGORY_ORDER: RelationshipCategory[] = [
   "romantic",
   "friend",
   "work",
+  "education",
   "other",
 ];
 
