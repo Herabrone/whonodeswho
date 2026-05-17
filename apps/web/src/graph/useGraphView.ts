@@ -8,6 +8,7 @@
  */
 import { useMemo } from "react";
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
+import { graphTokens } from "@/design-tokens";
 import type { Person, Relationship, RelationshipCategory, XYPosition } from "../types";
 import { CATEGORIES, CATEGORY_COLORS, WEAK_RELATIONSHIP_TYPES } from "../constants";
 import { useGraphStore } from "../store/useGraphStore";
@@ -229,7 +230,7 @@ export function useGraphView(): GraphView {
             treeShape,
           },
           style: {
-            stroke: "#868e96",
+            stroke: CATEGORY_COLORS.other,
             strokeWidth: 1.2,
             opacity: 0.7,
           },
@@ -246,17 +247,17 @@ export function useGraphView(): GraphView {
             visibleTimelineNodeIds.add(edge.source);
             visibleTimelineNodeIds.add(edge.target);
 
-            const color = CATEGORY_COLORS[edge.category];
+            const color = relationshipColors[edge.category] ?? CATEGORY_COLORS[edge.category];
             const style = timelineState.ended
               ? {
-                  stroke: "#9c9a93",
-                  strokeWidth: 1.5,
-                  opacity: timelineState.opacity ?? 0.2,
-                  strokeDasharray: "6 4",
+                  stroke: graphTokens.edge.endedColor,
+                  strokeWidth: graphTokens.edge.widthEnded,
+                  opacity: timelineState.opacity ?? graphTokens.edge.endedOpacity,
+                  strokeDasharray: graphTokens.edge.endedDash,
                 }
               : {
                   stroke: color,
-                  strokeWidth: 2,
+                  strokeWidth: graphTokens.edge.width,
                   opacity: timelineState.opacity ?? 1,
                 };
 
@@ -274,12 +275,15 @@ export function useGraphView(): GraphView {
               },
               style,
               labelStyle: {
-                fill: "#1a1d24",
+                fill: "var(--rf-graph-node-text)",
                 fontSize: 11,
                 fontWeight: 500,
                 opacity: style.opacity ?? 1,
               },
-              labelBgStyle: { fill: "#ffffff", opacity: timelineState.ended ? 0.35 : 0.9 },
+              labelBgStyle: {
+                fill: "var(--rf-graph-node-bg)",
+                opacity: timelineState.ended ? 0.35 : 0.85,
+              },
               labelBgPadding: [4, 2] as [number, number],
               labelBgBorderRadius: 4,
             } satisfies Edge];
@@ -359,10 +363,10 @@ export function useGraphView(): GraphView {
 
         const edgeStyle = timelineState.ended
           ? {
-              stroke: "#9c9a93",
-              strokeWidth: 1.5,
-              opacity: 0.2,
-              strokeDasharray: "6 4",
+              stroke: graphTokens.edge.endedColor,
+              strokeWidth: graphTokens.edge.widthEnded,
+              opacity: graphTokens.edge.endedOpacity,
+              strokeDasharray: graphTokens.edge.endedDash,
             }
           : {
               stroke: color,
@@ -391,14 +395,14 @@ export function useGraphView(): GraphView {
               : undefined,
           style: edgeStyle,
           labelStyle: {
-            fill: "#1a1d24",
+            fill: "var(--rf-graph-node-text)",
             fontSize: 11,
             fontWeight: 500,
             opacity: timelineState.ended ? 0.2 : dimmed ? 0.2 : 1,
           },
           labelBgStyle: {
-            fill: "#ffffff",
-            opacity: timelineState.ended ? 0.2 : dimmed ? 0.2 : 0.9,
+            fill: "var(--rf-graph-node-bg)",
+            opacity: timelineState.ended ? 0.2 : dimmed ? 0.2 : 0.85,
           },
           labelBgPadding: [4, 2] as [number, number],
           labelBgBorderRadius: 4,

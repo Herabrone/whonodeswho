@@ -131,10 +131,31 @@ export function GraphCanvas() {
       proOptions={{ hideAttribution: true }}
       minZoom={0.2}
       maxZoom={2}
+      style={{ background: "var(--rf-graph-canvas)" }}
     >
-      <Background color="#d8d6cf" gap={28} />
-      <Controls showInteractive={false} />
-      <MiniMap pannable zoomable nodeColor="#c3c1ba" maskColor="rgba(244,243,239,0.7)" />
+      <Background color="var(--rf-graph-grid-dot)" gap={26} />
+      <Controls
+        showInteractive={false}
+        style={{
+          background: "var(--rf-graph-control-bg)",
+          borderColor: "var(--rf-graph-control-border)",
+          borderRadius: "8px",
+          color: "var(--rf-graph-control-text)",
+          backdropFilter: "blur(14px)",
+        }}
+      />
+      <MiniMap
+        pannable
+        zoomable
+        nodeColor="var(--rf-graph-minimap-node)"
+        maskColor="var(--rf-graph-minimap-mask)"
+        style={{
+          background: "var(--rf-graph-minimap-bg)",
+          border: "1px solid var(--rf-graph-minimap-border)",
+          borderRadius: "9px",
+          backdropFilter: "blur(14px)",
+        }}
+      />
       <ViewportPortal>
         {layoutMode === "tree" && treeShape === "grouped" && groupedDivider ? (
           <div
@@ -143,7 +164,7 @@ export function GraphCanvas() {
               transform: `translate(${groupedDivider.x}px, ${groupedDivider.yTop}px)`,
               width: 0,
               height: groupedDivider.yBottom - groupedDivider.yTop,
-              borderLeft: "2px solid rgba(134, 142, 150, 0.65)",
+              borderLeft: "2px solid rgba(150,145,140,0.5)",
               pointerEvents: "none",
             }}
           />
@@ -160,9 +181,11 @@ export function GraphCanvas() {
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   fontWeight: 600,
-                  opacity: 0.35,
+                  opacity: 0.92,
                   pointerEvents: "none",
-                  background: "rgba(255,255,255,0.42)",
+                  background: "var(--rf-graph-control-bg)",
+                  border: "1px solid var(--rf-graph-control-border)",
+                  backdropFilter: "blur(14px)",
                   borderRadius: 999,
                   padding: "2px 8px",
                 }}
