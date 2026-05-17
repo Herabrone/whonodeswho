@@ -18,6 +18,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
     error: null,
   });
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,10 +80,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+
     try {
+      await useGraphStore.getState().flushPersistence().catch(() => undefined);
       await apiPost<AuthSessionResponse>("/auth/logout");
+    } catch (error) {
+      console.error("[AuthContext] logout request failed:", error);
     } finally {
       setState({ user: null, loading: false, error: null });
+      setSigningOut(false);
     }
     useGraphStore.getState().signOut();
   };
