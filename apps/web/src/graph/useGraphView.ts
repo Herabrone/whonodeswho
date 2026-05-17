@@ -239,6 +239,83 @@ export function useGraphView(): GraphView {
         }),
       ];
 
+      // Basic label collision avoidance for grouped-tree branch
+      try {
+        const nodePos = new Map(nodes.map((n) => [n.id, n.position]));
+        const candidates: {
+          edgeIndex: number;
+          edge: Edge;
+          baseX: number;
+          baseY: number;
+          width: number;
+          height: number;
+        }[] = [];
+
+        edges.forEach((edge, i) => {
+          if (!edge.label || typeof edge.label !== "string") return;
+          const src = nodePos.get(edge.source as string);
+          const tgt = nodePos.get(edge.target as string);
+          if (!src || !tgt) return;
+          const baseX = (src.x + tgt.x) / 2;
+          const baseY = (src.y + tgt.y) / 2;
+          const fontSize = (edge as any).labelStyle?.fontSize ?? 11;
+          const [padX = 4, padY = 2] = (edge as any).labelBgPadding ?? [4, 2];
+          const charWidth = Math.max(6, fontSize * 0.6);
+          const text = String(edge.label);
+          const width = Math.max(24, text.length * charWidth) + padX * 2;
+          const height = fontSize + padY * 2;
+          candidates.push({ edgeIndex: i, edge, baseX, baseY, width, height });
+        });
+
+        function rectsIntersect(a: any, b: any) {
+          const ax1 = a.baseX - a.width / 2;
+          const ax2 = a.baseX + a.width / 2;
+          const ay1 = a.baseY - a.height / 2;
+          const ay2 = a.baseY + a.height / 2;
+          const bx1 = b.baseX - b.width / 2;
+          const bx2 = b.baseX + b.width / 2;
+          const by1 = b.baseY - b.height / 2;
+          const by2 = b.baseY + b.height / 2;
+          return ax1 < bx2 && ax2 > bx1 && ay1 < by2 && ay2 > by1;
+        }
+
+        const n = candidates.length;
+        const visited = new Array(n).fill(false);
+        for (let i = 0; i < n; i++) {
+          if (visited[i]) continue;
+          const stack = [i];
+          const comp: number[] = [];
+          visited[i] = true;
+          while (stack.length > 0) {
+            const cur = stack.pop()!;
+            comp.push(cur);
+            for (let j = 0; j < n; j++) {
+              if (!visited[j] && rectsIntersect(candidates[cur], candidates[j])) {
+                visited[j] = true;
+                stack.push(j);
+              }
+            }
+          }
+
+          if (comp.length <= 1) continue;
+          comp.sort((a, b) => candidates[a].baseY - candidates[b].baseY);
+          const maxHeight = Math.max(...comp.map((idx) => candidates[idx].height));
+          const spacing = Math.max(14, maxHeight + 4);
+          const count = comp.length;
+          for (let k = 0; k < count; k++) {
+            const candidate = candidates[comp[k]];
+            const offset = (k - (count - 1) / 2) * spacing;
+            (candidate.edge.data as any) = {
+              ...(candidate.edge.data as any),
+              labelShiftPx: offset,
+            };
+            edges[candidate.edgeIndex] = candidate.edge;
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+
       let groupedDivider: GraphView["groupedDivider"] = null;
       if (layout.disconnectedIds.length > 0) {
         const xValues = layout.disconnectedIds
@@ -362,6 +439,83 @@ export function useGraphView(): GraphView {
           labelBgBorderRadius: 4,
         };
       });
+
+    // Basic label collision avoidance for general layout branch
+    try {
+      const nodePos = new Map(nodes.map((n) => [n.id, n.position]));
+      const candidates: {
+        edgeIndex: number;
+        edge: Edge;
+        baseX: number;
+        baseY: number;
+        width: number;
+        height: number;
+      }[] = [];
+
+      edges.forEach((edge, i) => {
+        if (!edge.label || typeof edge.label !== "string") return;
+        const src = nodePos.get(edge.source as string);
+        const tgt = nodePos.get(edge.target as string);
+        if (!src || !tgt) return;
+        const baseX = (src.x + tgt.x) / 2;
+        const baseY = (src.y + tgt.y) / 2;
+        const fontSize = (edge as any).labelStyle?.fontSize ?? 11;
+        const [padX = 4, padY = 2] = (edge as any).labelBgPadding ?? [4, 2];
+        const charWidth = Math.max(6, fontSize * 0.6);
+        const text = String(edge.label);
+        const width = Math.max(24, text.length * charWidth) + padX * 2;
+        const height = fontSize + padY * 2;
+        candidates.push({ edgeIndex: i, edge, baseX, baseY, width, height });
+      });
+
+      function rectsIntersect(a: any, b: any) {
+        const ax1 = a.baseX - a.width / 2;
+        const ax2 = a.baseX + a.width / 2;
+        const ay1 = a.baseY - a.height / 2;
+        const ay2 = a.baseY + a.height / 2;
+        const bx1 = b.baseX - b.width / 2;
+        const bx2 = b.baseX + b.width / 2;
+        const by1 = b.baseY - b.height / 2;
+        const by2 = b.baseY + b.height / 2;
+        return ax1 < bx2 && ax2 > bx1 && ay1 < by2 && ay2 > by1;
+      }
+
+      const n = candidates.length;
+      const visited = new Array(n).fill(false);
+      for (let i = 0; i < n; i++) {
+        if (visited[i]) continue;
+        const stack = [i];
+        const comp: number[] = [];
+        visited[i] = true;
+        while (stack.length > 0) {
+          const cur = stack.pop()!;
+          comp.push(cur);
+          for (let j = 0; j < n; j++) {
+            if (!visited[j] && rectsIntersect(candidates[cur], candidates[j])) {
+              visited[j] = true;
+              stack.push(j);
+            }
+          }
+        }
+
+        if (comp.length <= 1) continue;
+        comp.sort((a, b) => candidates[a].baseY - candidates[b].baseY);
+        const maxHeight = Math.max(...comp.map((idx) => candidates[idx].height));
+        const spacing = Math.max(14, maxHeight + 4);
+        const count = comp.length;
+        for (let k = 0; k < count; k++) {
+          const candidate = candidates[comp[k]];
+          const offset = (k - (count - 1) / 2) * spacing;
+          (candidate.edge.data as any) = {
+            ...(candidate.edge.data as any),
+            labelShiftPx: offset,
+          };
+          edges[candidate.edgeIndex] = candidate.edge;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
 
     const radialLabels =
       treeActive && treeRootId && treeShape === "radial" && treeStructure && treePositions

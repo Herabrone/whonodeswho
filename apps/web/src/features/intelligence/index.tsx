@@ -89,8 +89,8 @@ export function IntelligenceFeature() {
 
   return (
     <>
-      <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 w-[860px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
-        <div className="pointer-events-auto rounded-xl border border-line bg-panel/95 p-3 shadow-lg backdrop-blur">
+      <div className="pointer-events-none absolute bottom-4 left-4 z-20 w-[480px] max-w-[calc(100vw-2rem)]">
+        <div className="pointer-events-auto rounded-xl border border-line bg-panel/95 p-2 shadow-lg backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
               <select
@@ -124,27 +124,27 @@ export function IntelligenceFeature() {
               ) : null}
             </div>
 
-            <div className="flex items-center rounded-lg border border-line bg-canvas p-1 text-xs">
-              {([
-                { label: "Direct", value: 1 as FocusDegrees },
-                { label: "2", value: 2 as FocusDegrees },
-                { label: "3", value: 3 as FocusDegrees },
-                { label: "All", value: "all" as FocusDegrees },
-              ]).map((item) => (
-                <button
-                  key={String(item.value)}
-                  type="button"
-                  onClick={() => applyDegrees(item.value)}
-                  className={`rounded px-2 py-1 ${
-                    focusDegrees === item.value
-                      ? "bg-accent text-white"
-                      : "text-ink hover:bg-panel"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+            {focusPersonId ? (
+              <div className="flex items-center rounded-lg border border-line bg-canvas p-1 text-xs">
+                {([
+                  { label: "Direct", value: 1 as FocusDegrees },
+                  { label: "2", value: 2 as FocusDegrees },
+                  { label: "3", value: 3 as FocusDegrees },
+                  { label: "All", value: "all" as FocusDegrees },
+                ]).map((item) => (
+                  <button
+                    key={String(item.value)}
+                    type="button"
+                    onClick={() => applyDegrees(item.value)}
+                    className={`rounded px-2 py-1 ${
+                      focusDegrees === item.value ? "bg-accent text-white" : "text-ink hover:bg-panel"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
 
             {/* Clear focus button removed; use inline X next to focused person */}
 
@@ -156,16 +156,7 @@ export function IntelligenceFeature() {
               Degrees between people
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                clearPath();
-                setPathMessage("");
-              }}
-              className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
-            >
-              Clear path
-            </button>
+            {/* Clear path button removed from the bottom bar; use the Clear inside the path panel */}
           </div>
 
           <div className="mt-2 text-xs text-muted">
@@ -178,8 +169,8 @@ export function IntelligenceFeature() {
       </div>
 
       {pathPersonIds.length > 0 && (
-        <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 w-[860px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
-          <div className="pointer-events-auto rounded-xl border border-line bg-panel/95 p-3 shadow-lg">
+        <div className="pointer-events-none absolute bottom-28 left-1/2 z-20 w-[520px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
+          <div className="pointer-events-auto rounded-xl border border-line bg-panel/95 p-2 shadow-lg">
             <h4 className="mb-1 text-sm font-semibold text-ink">Shortest path</h4>
             <p className="mb-1 text-sm text-ink">{pathChain}</p>
             <p className="mb-2 text-xs text-muted">
@@ -196,7 +187,7 @@ export function IntelligenceFeature() {
                 clearPath();
                 setPathMessage("");
               }}
-              className="rounded-lg border border-line bg-canvas px-3 py-1.5 text-xs text-ink hover:bg-panel"
+              className="rounded-lg border border-line bg-canvas px-2 py-1 text-xs text-ink hover:bg-panel"
             >
               Clear path
             </button>

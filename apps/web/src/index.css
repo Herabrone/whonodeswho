@@ -18,3 +18,15 @@ body {
 .react-flow__attribution {
   display: none;
 }
+
+/* MiniMap viewport styling: semi-transparent blue fill with solid border */
+.react-flow__minimap-viewport {
+  fill: rgba(59,130,246,0.28) !important;
+  stroke: rgba(59,130,246,0.85) !important;
+  stroke-width: 1.4 !important;
+}
+
+/* Ensure the minimap mask uses a subtle dark overlay for areas outside the viewport */
+.react-flow__minimap-mask {
+  fill: rgba(0,0,0,0.15) !important;
+}
