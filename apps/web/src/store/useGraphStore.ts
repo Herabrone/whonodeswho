@@ -157,7 +157,7 @@ export interface GraphStore
   setTimelineYear: (value: number | ((prev: number) => number)) => void;
   setTimelinePlaying: (value: boolean) => void;
   setTimelineSpeed: (speed: 1 | 2 | 3) => void;
-  endRelationship: (id: string) => void;
+  endRelationship: (id: string, endYear?: number) => void;
 
   // -- legend actions (Contract Amendment) --
   updateCategoryLabel: (category: RelationshipCategory, label: string) => void;
@@ -583,9 +583,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     })),
   setTimelinePlaying: (value) => set({ timelinePlaying: value }),
   setTimelineSpeed: (speed) => set({ timelineSpeed: speed }),
-  endRelationship: (id) => {
+  endRelationship: (id, endYear) => {
     get().updateRelationship(id, {
-      endYear: getCurrentYear(),
+      endYear: endYear ?? getCurrentYear(),
       isActive: false,
     });
   },

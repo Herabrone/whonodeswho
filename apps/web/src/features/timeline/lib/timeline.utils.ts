@@ -4,7 +4,7 @@ export function getTimelineRange(
   relationships: Relationship[],
 ): { min: number; max: number } | null {
   const years = relationships
-    .map((relationship) => relationship.startYear)
+    .flatMap((relationship) => [relationship.startYear, relationship.endYear])
     .filter((year): year is number => typeof year === "number");
 
   if (years.length === 0) return null;
@@ -27,7 +27,7 @@ export function getRelationshipsAtYear(
     .map((relationship) => ({
       rel: relationship,
       ended:
-        relationship.isActive === false &&
+        (relationship.isActive === false || relationship.endYear !== undefined) &&
         relationship.endYear !== undefined &&
         relationship.endYear <= year,
     }));

@@ -318,6 +318,7 @@ export class GraphService {
       value === 'friend' ||
       value === 'romantic' ||
       value === 'work' ||
+      value === 'education' ||
       value === 'other'
     );
   }

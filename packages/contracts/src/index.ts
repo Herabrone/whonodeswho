@@ -9,6 +9,7 @@ export type RelationshipCategory =
   | "friend"
   | "romantic"
   | "work"
+  | "education"
   | "other";
 
 export type RelationshipDirection = "one-way" | "two-way";
@@ -38,6 +39,107 @@ export interface Relationship {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type EpisodeKind =
+  | "coworker"
+  | "manager"
+  | "employee"
+  | "friend"
+  | "close_friend"
+  | "romantic_partner"
+  | "spouse"
+  | "ex_partner"
+  | "family"
+  | "classmate"
+  | "roommate"
+  | "custom";
+
+export type EpisodeCertainty = "exact" | "approximate" | "unknown";
+
+export type EpisodeSource = "user" | "inferred" | "imported";
+
+export interface RelationshipThread {
+  id: string;
+  personAId: string;
+  personBId: string;
+  summary?: string;
+  colorOverride?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RelationshipEpisode {
+  id: string;
+  threadId: string;
+  kind: EpisodeKind;
+  label?: string;
+  startDate: string;
+  endDate?: string;
+  certainty: EpisodeCertainty;
+  source: EpisodeSource;
+  notes?: string;
+  strength?: number;
+}
+
+export interface RelationshipEvent {
+  id: string;
+  threadId: string;
+  date: string;
+  type: "met" | "milestone" | "custom";
+  title: string;
+  description?: string;
+}
+
+export type ThreadVisibility = "hidden" | "future" | "active" | "ended" | "dormant";
+
+export interface ThreadTimelineState {
+  threadId: string;
+  visibility: ThreadVisibility;
+  activeEpisodes: RelationshipEpisode[];
+  endedEpisodes: RelationshipEpisode[];
+  futureEpisodes: RelationshipEpisode[];
+  displayLabel: string;
+  displayCategory: RelationshipCategory;
+  displayColor: string;
+  edgeStyle: "solid" | "dashed" | "ghost" | "multi";
+  badges: string[];
+  startedAt?: string;
+  lastChangedAt?: string;
+  nextChangeAt?: string;
+  tooltip: string;
+}
+
+export interface DerivedTimelineMarker {
+  date: string;
+  kind: "episode_start" | "episode_end" | "stored_event";
+  label: string;
+  episodeId?: string;
+  eventId?: string;
+}
+
+export interface RelationshipHistoryGraphData {
+  people: Person[];
+  threads: Record<string, RelationshipThread>;
+  episodes: Record<string, RelationshipEpisode>;
+  events: Record<string, RelationshipEvent>;
+}
+
+export interface RelationshipHistoryPersistedState {
+  graph: RelationshipHistoryGraphData;
+  positions: Record<string, XYPosition>;
+  layout: {
+    layoutMode: LayoutMode;
+    treeShape: TreeShape;
+    treeRootId: string | null;
+  };
+}
+
+export type LegacyRelationship = Relationship;
+
+export interface LegacyGraphData {
+  people: Person[];
+  relationships: LegacyRelationship[];
 }
 
 export interface GraphData {

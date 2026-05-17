@@ -6,6 +6,7 @@ const ORDERED_CATEGORIES: RelationshipCategory[] = [
   "romantic",
   "friend",
   "work",
+  "education",
   "other",
 ];
 

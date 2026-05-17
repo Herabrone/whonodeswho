@@ -3,6 +3,7 @@
  * Kept in the API so every device gets the same starting graph.
  */
 import type { GraphData, XYPosition } from '@relationflow/contracts';
+import type { RelationshipCategory } from '@relationflow/contracts';
 
 const ts = '2024-01-01T00:00:00.000Z';
 
@@ -21,7 +22,7 @@ function r(
   source: string,
   target: string,
   type: string,
-  category: 'family' | 'friend' | 'romantic' | 'work' | 'other',
+  category: RelationshipCategory,
   direction: 'one-way' | 'two-way' = 'two-way',
   notes?: string,
 ) {
@@ -63,7 +64,7 @@ export const SEED_GRAPH: GraphData = {
     r('e8', 'grace', 'frank', 'manager', 'work', 'one-way'),
     r('e9', 'erin', 'henry', 'spouse', 'romantic', 'two-way'),
     r('e10', 'alice', 'ivy', 'acquaintance', 'friend', 'two-way', 'Lost touch.'),
-    r('e11', 'frank', 'jack', 'classmate', 'other', 'two-way'),
+    r('e11', 'frank', 'jack', 'classmate', 'education', 'two-way'),
     r('e12', 'dan', 'kim', 'sibling', 'family', 'two-way'),
   ],
 };
