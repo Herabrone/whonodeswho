@@ -14,6 +14,19 @@ export type RelationshipCategory =
 
 export type RelationshipDirection = "one-way" | "two-way";
 
+export type RelationshipPhaseSource = "user" | "legacy" | "inferred";
+
+export interface RelationshipPhase {
+  id: string;
+  type: string;
+  category: RelationshipCategory;
+  label: string;
+  startYear: number;
+  endYear?: number;
+  notes?: string;
+  source?: RelationshipPhaseSource;
+}
+
 export interface Person {
   id: string;
   name: string;
@@ -37,6 +50,7 @@ export interface Relationship {
   isActive?: boolean;
   color?: string;
   notes?: string;
+  phases?: RelationshipPhase[];
   createdAt: string;
   updatedAt: string;
 }
