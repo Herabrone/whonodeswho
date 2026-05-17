@@ -4,7 +4,7 @@
  * the store (selection, drag position). It is a PURE FUNCTION OF STORE STATE —
  * no track should ever need to edit this file.
  */
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ViewportPortal,
   ReactFlow,
@@ -25,9 +25,64 @@ import { useGraphStore } from "../store/useGraphStore";
 import { FloatingEdge } from "./FloatingEdge";
 import { dispatchOpenRelationshipComposer } from "../features/crud/relationshipComposerEvent";
 import { CategoryNode } from "./CategoryNode";
+import { CATEGORY_COLORS } from "../constants";
 
 const nodeTypes = { person: PersonNode, category: CategoryNode };
 const edgeTypes = { relationship: FloatingEdge };
+
+function MinimapContainer() {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div style={{ position: "absolute", right: 12, bottom: 12, zIndex: 60 }}>
+      <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+        <button
+          aria-label="Toggle minimap"
+          onClick={() => setOpen((v) => !v)}
+          style={{
+            marginRight: 8,
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            border: "1px solid rgba(0,0,0,0.06)",
+            background: "rgba(255,255,255,0.9)",
+            cursor: "pointer",
+          }}
+        >
+          {open ? "◀" : "▶"}
+        </button>
+
+        <div
+          style={{
+            width: open ? 220 : 0,
+            height: open ? 140 : 0,
+            overflow: "hidden",
+            transition: "width 200ms ease, height 200ms ease",
+            borderRadius: 8,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+            border: "1px solid rgba(0,0,0,0.06)",
+            background: "rgba(255,255,255,0.96)",
+          }}
+        >
+          {open && (
+            <MiniMap
+              pannable
+              zoomable
+              maskColor="rgba(244,243,239,0.7)"
+              nodeColor={(n) => {
+                const d = (n.data as any) ?? {};
+                if (d.person?.color) return d.person.color;
+                if (d.category) return CATEGORY_COLORS[d.category as keyof typeof CATEGORY_COLORS] ?? "#c3c1ba";
+                return "#c3c1ba";
+              }}
+              nodeStrokeColor={() => "rgba(0,0,0,0.12)"}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function GraphCanvas() {
   const { nodes, edges, radialLabels, groupedDivider } = useGraphView();
@@ -134,7 +189,9 @@ export function GraphCanvas() {
     >
       <Background color="#d8d6cf" gap={28} />
       <Controls showInteractive={false} />
-      <MiniMap pannable zoomable nodeColor="#c3c1ba" maskColor="rgba(244,243,239,0.7)" />
+
+      {/* Collapsible MiniMap (bottom-right). Shows live miniature preview of the graph. */}
+      <MinimapContainer />
       <ViewportPortal>
         {layoutMode === "tree" && treeShape === "grouped" && groupedDivider ? (
           <div

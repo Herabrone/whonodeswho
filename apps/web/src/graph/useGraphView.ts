@@ -92,6 +92,14 @@ export function useGraphView(): GraphView {
       layoutMode === "tree" && treeRootId !== null && people.some((p) => p.id === treeRootId);
     const groupedTreeActive = treeActive && treeShape === "grouped";
 
+    const capitalizeLabel = (s: string | undefined) =>
+      !s || s.length === 0
+        ? s ?? s
+        : s
+            .split(" ")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+
     if (groupedTreeActive && treeRootId) {
       const layout = computeCategoryTree(graph, treeRootId);
       const query = searchQuery.trim().toLowerCase();
@@ -208,7 +216,7 @@ export function useGraphView(): GraphView {
             sourceHandle: "cat-b",
             targetHandle: "t",
             type: "relationship",
-            label: edge.relationshipType,
+            label: capitalizeLabel(edge.relationshipType),
             data: {
               layoutMode,
               treeShape,
@@ -297,6 +305,14 @@ export function useGraphView(): GraphView {
       };
     });
 
+    const capitalizeLabelGlobal = (s: string | undefined) =>
+      !s || s.length === 0
+        ? s ?? s
+        : s
+            .split(" ")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+
     const edges: Edge[] = relationships
       .filter((r) => visible.has(r.category))
       .filter((r) => !(hideWeak && WEAK_RELATIONSHIP_TYPES.has(r.type)))
@@ -319,7 +335,7 @@ export function useGraphView(): GraphView {
           source: r.source,
           target: r.target,
           type: "relationship",
-          label: showLabels ? r.type : undefined,
+          label: showLabels ? capitalizeLabelGlobal(r.type) : undefined,
           selected: selectedRelationshipId === r.id,
           data: {
             layoutMode,

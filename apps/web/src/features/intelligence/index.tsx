@@ -47,7 +47,15 @@ export function IntelligenceFeature() {
       );
       const from = byId.get(a)?.name ?? "Unknown";
       const to = byId.get(b)?.name ?? "Unknown";
-      const label = relation?.type ?? "connected";
+      const capitalize = (t: string | undefined) =>
+        !t || t.length === 0
+          ? t ?? t
+          : t
+              .split(" ")
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(" ");
+
+      const label = capitalize(relation?.type ?? "connected");
       hops.push(`${from} -${label}-> ${to}`);
     }
     return hops;
@@ -84,7 +92,8 @@ export function IntelligenceFeature() {
       <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 w-[860px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
         <div className="pointer-events-auto rounded-xl border border-line bg-panel/95 p-3 shadow-lg backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <div className="flex items-center gap-2">
+              <select
               value={focusPersonId ?? ""}
               onChange={(e) => {
                 const nextId = e.target.value;
@@ -103,6 +112,17 @@ export function IntelligenceFeature() {
                 </option>
               ))}
             </select>
+
+              {focusPersonId ? (
+                <button
+                  aria-label="Clear focus"
+                  onClick={() => clearFocus()}
+                  className="rounded-full border border-line bg-canvas px-2 py-1 text-xs text-muted hover:bg-panel"
+                >
+                  x
+                </button>
+              ) : null}
+            </div>
 
             <div className="flex items-center rounded-lg border border-line bg-canvas p-1 text-xs">
               {([
@@ -126,13 +146,7 @@ export function IntelligenceFeature() {
               ))}
             </div>
 
-            <button
-              type="button"
-              onClick={clearFocus}
-              className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
-            >
-              Clear focus
-            </button>
+            {/* Clear focus button removed; use inline X next to focused person */}
 
             <button
               type="button"

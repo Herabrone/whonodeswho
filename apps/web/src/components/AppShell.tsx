@@ -47,7 +47,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
               }`}
               onClick={() => setLayoutMode("free")}
             >
-              Free
+              Web
             </button>
             <button
               type="button"
@@ -96,9 +96,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
               </button>
             </div>
           ) : null}
-          <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
-            Phase 0 · foundation
-          </span>
+          {/* Phase badge removed per UX update */}
           <button
             onClick={signOut}
             className="text-xs font-medium text-muted hover:text-ink transition-colors"
