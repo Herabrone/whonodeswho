@@ -89,7 +89,7 @@ export function IntelligenceFeature() {
 
   return (
     <>
-      <div className="pointer-events-none absolute bottom-4 left-4 z-20 w-[480px] max-w-[calc(100vw-2rem)]">
+      <div className="pointer-events-none absolute bottom-4 left-16 z-20 w-[480px] max-w-[calc(100vw-2rem)]">
         <div className="pointer-events-auto rounded-xl border border-line bg-panel/95 p-2 shadow-lg backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
@@ -159,11 +159,13 @@ export function IntelligenceFeature() {
             {/* Clear path button removed from the bottom bar; use the Clear inside the path panel */}
           </div>
 
-          <div className="mt-2 text-xs text-muted">
-            {focusPersonId && focusedPersonName
-              ? `Showing ${focusedPersonName} + ${Math.max(focusCount - 1, 0)} people within ${String(focusDegrees)} degree(s).`
-              : "Focus mode is off."}
-          </div>
+          {focusPersonId && focusedPersonName ? (
+            <div className="mt-2 text-xs text-muted">
+              {`Showing ${focusedPersonName} + ${Math.max(focusCount - 1, 0)} people within ${String(
+                focusDegrees,
+              )} degree(s).`}
+            </div>
+          ) : null}
           {pathMessage && <div className="mt-1 text-xs text-muted">{pathMessage}</div>}
         </div>
       </div>

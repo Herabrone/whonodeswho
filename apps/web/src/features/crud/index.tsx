@@ -711,7 +711,13 @@ export function CrudFeature() {
 
       {(modal.type === "person-create" || modal.type === "person-edit") && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-4">
-          <div className="w-[520px] max-w-full rounded-xl border border-line bg-panel p-4 shadow-xl">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitPerson();
+            }}
+            className="w-[520px] max-w-full rounded-xl border border-line bg-panel p-4 shadow-xl"
+          >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-display text-lg text-ink">
                 {modal.type === "person-edit" ? "Edit person" : "Add person"}
@@ -776,14 +782,13 @@ export function CrudFeature() {
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={submitPerson}
+                type="submit"
                 className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white"
               >
                 Save
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 

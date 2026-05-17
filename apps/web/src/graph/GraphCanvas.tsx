@@ -218,7 +218,7 @@ function MinimapContainer({ nodes, edges }: { nodes: any[]; edges: any[] }) {
           flexShrink: 0,
           alignSelf: "flex-end",
           marginBottom: (PANEL_H - TAB_W) / 2,
-          borderRadius: "8px 0 0 8px",
+          borderRadius: isCollapsed ? "0 8px 8px 0" : "8px 0 0 8px",
           border: "1px solid rgba(0,0,0,0.08)",
           borderRight: "none",
           background: "rgba(255,255,255,0.95)",
@@ -229,6 +229,8 @@ function MinimapContainer({ nodes, edges }: { nodes: any[]; edges: any[] }) {
           justifyContent: "center",
           fontSize: 10,
           zIndex: 1,
+          transform: isCollapsed ? `translateX(${PANEL_W}px)` : "translateX(0)",
+          transition: "transform 300ms ease",
         }}
       >
         {isCollapsed ? "\u25C0" : "\u25B6"}
