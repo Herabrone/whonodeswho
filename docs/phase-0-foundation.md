@@ -1,159 +1,88 @@
-# Phase 0 — Foundation (DONE)
+# Phase 0 — Foundation
 
-Phase 0 is **already built in this repo**. This document is the reference the
-three track agents use: it describes every contract they will consume. Phase 0
-is blocking — merge and verify it before starting Tracks A/B/C.
+Phase 0 is the complete running baseline that all feature tracks build on. It is
+**done**. This document describes what it delivers and how it works.
 
-## 1. Verify Phase 0
+## What Phase 0 delivers
 
-```bash
-npm install
-npm run typecheck   # tsc -b, no errors
-npm run build       # vite build succeeds
-npm test            # vitest: graph primitive tests pass
-npm run dev         # app loads, seed graph of 11 people is draggable
-```
+- Graph canvas (React Flow) that renders people as nodes and relationships as
+  colored, labeled edges.
+- Zustand store with a full state shape for data, selection, view filters, focus,
+  layout, and legend.
+- Async `RelationshipStore` persistence abstraction, currently backed by an HTTP
+  store that round-trips to the NestJS backend.
+- NestJS backend with email/password auth, server-side sessions, and full-graph
+  snapshot persistence in SQLite via Prisma.
+- Shared TypeScript contracts package (`@relationflow/contracts`) consumed by
+  both apps.
+- Demo seed graph written server-side on first registration so every new account
+  starts with the same graph on any device.
+- Three feature track stubs in `src/features/crud`, `src/features/intelligence`,
+  and `src/features/filtering`, all in-progress in parallel.
 
-On first run the app seeds a demo graph (Alice Tran's network) so every track
-has data to develop against. Three dashed placeholder cards mark the reserved
-regions for Tracks A/B/C.
+## Store API reference
 
-## 2. File map
+All tracks integrate through `useGraphStore`. The full interface is defined in
+`apps/web/src/store/useGraphStore.ts`.
 
-```
-src/
-  types.ts                 Frozen domain types (the core contract)
-  constants.ts             Category colors, relationship catalog, helpers
-  lib/
-    graph.ts               Graph algorithm primitives (frozen)
-    graph.test.ts          Unit tests for the primitives
-    id.ts                  newId() / nowIso() helpers
-  data/seed.ts             Demo graph + hand-placed positions
-  store/
-    persistence.ts         RelationshipStore interface (backend-swap contract)
-    localStorageStore.ts   localStorage implementation + singleton
-    useGraphStore.ts       Zustand store — THE integration contract
-  graph/
-    useGraphView.ts        Derives styled RF nodes/edges from store state
-    PersonNode.tsx         Custom RF node
-    GraphCanvas.tsx        React Flow surface (pure fn of store)
-  components/AppShell.tsx  App chrome
-  App.tsx                  Composition root (hydrate + seed + compose)
-  features/
-    crud/index.tsx         Track A stub
-    intelligence/index.tsx Track B stub
-    filtering/index.tsx    Track C stub
-```
+### Lifecycle
 
-## 3. Type contract — `src/types.ts`
-
-```ts
-type RelationshipCategory = "family" | "friend" | "romantic" | "work" | "other";
-type RelationshipDirection = "one-way" | "two-way";
-type FocusDegrees = 1 | 2 | 3 | "all";
-
-interface Person {
-  id: string; name: string; notes?: string; color?: string;
-  createdAt: string; updatedAt: string;       // ISO 8601
-}
-interface Relationship {
-  id: string; source: string; target: string; // source/target are Person.id
-  type: string; category: RelationshipCategory;
-  direction: RelationshipDirection; color?: string; notes?: string;
-  createdAt: string; updatedAt: string;
-}
-interface GraphData { people: Person[]; relationships: Relationship[]; }
-interface XYPosition { x: number; y: number; }
-interface PersistedState { graph: GraphData; positions: Record<string, XYPosition>; }
-
-type PersonInput       = Omit<Person, "id" | "createdAt" | "updatedAt">;
-type RelationshipInput = Omit<Relationship, "id" | "createdAt" | "updatedAt">;
-```
-
-## 4. Store API — `src/store/useGraphStore.ts`
-
-`useGraphStore` is a Zustand hook. Read state with a selector; call actions
-directly. Example:
-
-```ts
-const people   = useGraphStore((s) => s.people);
-const addPerson = useGraphStore((s) => s.addPerson);
-```
-
-### State
-`people`, `relationships`, `positions`, `selectedPersonId`,
-`selectedRelationshipId`, `visibleCategories`, `showLabels`, `hideWeak`,
-`searchQuery`, `focusPersonId`, `focusDegrees`, `pathPersonIds`, `hydrated`,
-`layoutMode`, `treeShape`, `treeRootId`.
-
-### Actions
 | Action | Signature | Notes |
 |--------|-----------|-------|
-| `addPerson` | `(PersonInput) => Person` | generates id/timestamps |
-| `updatePerson` | `(id, Partial<PersonInput>) => void` | |
-| `deletePerson` | `(id) => void` | cascades: removes touching relationships |
-| `addRelationship` | `(RelationshipInput) => Relationship` | |
-| `updateRelationship` | `(id, Partial<RelationshipInput>) => void` | |
-| `deleteRelationship` | `(id) => void` | |
-| `replaceGraph` | `(GraphData) => void` | used by import |
-| `setPosition` | `(personId, XYPosition) => void` | canvas drag |
-| `selectPerson` | `(id \| null) => void` | clears relationship selection |
-| `selectRelationship` | `(id \| null) => void` | clears person selection |
-| `clearSelection` | `() => void` | |
-| `setVisibleCategories` | `(RelationshipCategory[]) => void` | |
-| `toggleCategory` | `(RelationshipCategory) => void` | |
-| `setShowLabels` | `(boolean) => void` | |
-| `setHideWeak` | `(boolean) => void` | |
-| `setSearchQuery` | `(string) => void` | |
-| `resetView` | `() => void` | restores view + clears focus/path |
-| `setFocus` | `(personId \| null, degrees?) => void` | |
-| `setFocusDegrees` | `(FocusDegrees) => void` | |
-| `clearFocus` | `() => void` | |
-| `setPath` | `(personIds: string[]) => void` | degrees-of-separation result |
-| `clearPath` | `() => void` | |
-| `setLayoutMode` | `("free" \| "tree") => void` | layout mode toggle |
-| `setTreeShape` | `("radial" \| "layered") => void` | tree layout style |
-| `setTreeRoot` | `(personId: string \| null) => void` | active tree root |
+| `hydrate` | `() => Promise<void>` | Loads the user's graph from the backend. Called once on auth. |
+| `signOut` | `() => void` | Clears all graph state in memory. Called by `AuthContext` on logout. |
 
-State auto-persists (debounced 400ms) after any data/position mutation.
-Layout preferences (`layoutMode`, `treeShape`, `treeRootId`) are also persisted.
+### Data actions (Track A)
 
-### Selectors
-```ts
-selectPersonById(id)        // (store) => Person | null
-selectRelationshipById(id)  // (store) => Relationship | null
-selectRelationshipsOf(id)   // (store) => Relationship[]   (edges touching id)
-```
+| Action | Signature |
+|--------|-----------|
+| `addPerson` | `(input: PersonInput) => Person` |
+| `updatePerson` | `(id, patch: Partial<PersonInput>) => void` |
+| `deletePerson` | `(id) => void` — cascades: removes touching relationships and positions |
+| `addRelationship` | `(input: RelationshipInput) => Relationship` |
+| `updateRelationship` | `(id, patch: Partial<RelationshipInput>) => void` |
+| `deleteRelationship` | `(id) => void` |
+| `replaceGraph` | `(graph: GraphData) => void` — replaces entire graph; resets positions |
+| `setPosition` | `(personId, pos: XYPosition) => void` |
 
-## 5. Graph primitives — `src/lib/graph.ts`
+### Selection actions
 
-All traversal treats relationships as **undirected**.
+| Action | Signature |
+|--------|-----------|
+| `selectPerson` | `(id \| null) => void` |
+| `selectRelationship` | `(id \| null) => void` |
+| `clearSelection` | `() => void` |
 
-```ts
-buildAdjacency(graph): Adjacency                          // Map<id, Set<id>>
-getNeighbors(adj, personId): string[]
-getNodesWithinDegrees(adj, startId, degrees|"all"): Set<string>
-findShortestPath(adj, startId, targetId): string[] | null // BFS, inclusive
-pathEdgeIds(graph, path): string[]                        // edges along a path
-autoLayout(index, total, center?): XYPosition             // circular layout
-```
+### View actions (Track C)
 
-## 5.1 Tree layout primitives — `src/graph/layout.ts`
+| Action | Signature |
+|--------|-----------|
+| `setVisibleCategories` | `(categories: RelationshipCategory[]) => void` |
+| `toggleCategory` | `(category) => void` |
+| `setShowLabels` | `(value: boolean) => void` |
+| `setHideWeak` | `(value: boolean) => void` |
+| `setSearchQuery` | `(query: string) => void` |
+| `resetView` | `() => void` |
 
-```ts
-type TreeShape = "radial" | "layered";
-computeTreeLayout(graph, rootId, shape): Record<string, XYPosition>
-buildTreeStructure(graph, rootId): TreeStructure
-isTreePrimaryEdge(structure, source, target): boolean
-computeRadialCategoryLabels(graph, rootId, positions, structure, colors)
-```
+### Focus actions (Track B)
 
-Tree mode uses a BFS spanning tree from the selected root, sorts children by
-relationship category (`family`, `romantic`, `friend`, `work`, `other`) then
-name, and feeds the sorted hierarchy into `d3-hierarchy` for radial or layered
-coordinates. Disconnected people are parked below the tree instead of dropped.
+| Action | Signature |
+|--------|-----------|
+| `setFocus` | `(personId \| null, degrees?: FocusDegrees) => void` |
+| `setFocusDegrees` | `(degrees: FocusDegrees) => void` |
+| `clearFocus` | `() => void` |
+| `setPath` | `(personIds: string[]) => void` |
+| `clearPath` | `() => void` |
 
-## 6. Persistence / backend-swap — `src/store/persistence.ts`
+### Layout actions
+
+| Action | Signature |
+|--------|-----------|
+| `setLayoutMode` | `(mode: LayoutMode) => void` |
+| `setTreeShape` | `(shape: TreeShape) => void` |
+| `setTreeRoot` | `(personId \| null) => void` |
+
+## Persistence contract
 
 ```ts
 interface RelationshipStore {
@@ -163,23 +92,37 @@ interface RelationshipStore {
 }
 ```
 
-`LocalStorageStore` implements it today. To move to a backend later, write a
-`SupabaseStore implements RelationshipStore` and change the single `export
-const persistenceStore = …` line in `localStorageStore.ts`. The async interface
-means no other file changes. **This swap is out of MVP scope** — listed here so
-tracks build against the async API and never assume synchronous storage.
+The store calls `save` with a 400 ms debounce after every mutation. The
+production implementation (`HttpStore`) calls `PUT /graph` with the full
+`PersistedState` snapshot. The store only ever references this interface; the
+implementation can be swapped without touching the store.
 
-## 7. How the canvas restyles itself
+## Graph algorithms
 
-`useGraphView.ts` recomputes React Flow nodes/edges whenever relevant store
-fields change:
+`apps/web/src/lib/graph.ts` provides pure functions (no React, no store):
 
-- `focusPersonId` + `focusDegrees` → nodes/edges outside the focus set get
-  `opacity: 0.18 / 0.12` (dimmed).
-- `pathPersonIds` → path nodes get a ring, path edges thicken.
-- `searchQuery` → matching nodes get a highlight ring.
-- `visibleCategories` / `hideWeak` → non-matching edges are removed.
-- `showLabels` → edge labels shown/hidden.
+- `getNeighbours(graph, personId, degrees)` — BFS neighbours within N degrees
+- `getShortestPath(graph, fromId, toId)` — BFS shortest path as ordered id array
+- `getConnectedIds(graph, personId, degrees)` — ids reachable within N degrees
 
-So Tracks B and C deliver **controls only** — they flip store fields and the
-canvas follows. They never import from `src/graph/`.
+## Type contract
+
+The canonical types live in `packages/contracts/src/index.ts`. The frontend
+`apps/web/src/types.ts` is a pure re-export so old `../types` imports continue
+to resolve. No logic should be added to `src/types.ts`.
+
+## Backend persistence model
+
+User data is stored in a single `User` row per account. The graph is stored as
+two JSON columns (`graphJson`, `positionsJson`) and three scalar layout columns.
+The full `PersistedState` round-trips between the frontend snapshot model and the
+database row in `GraphService`.
+
+## What each track must not touch
+
+- `apps/web/src/types.ts` — re-export only
+- `apps/web/src/store/useGraphStore.ts` — tracks add actions through the file's
+  declared interface but must not add track-specific state to the store
+- `apps/web/src/graph/` — Phase 0 canvas; tracks do not edit canvas primitives
+- `apps/api/` — tracks do not modify the backend
+- `packages/contracts/` — additive changes only, by agreement

@@ -1,35 +1,24 @@
 {
-  "name": "relation-flow",
+  "name": "relationflow-workspace",
   "private": true,
-  "version": "0.1.0",
-  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit",
-    "lint": "eslint .",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "@xyflow/react": "^12.3.5",
-    "d3-hierarchy": "^3.1.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "zustand": "^5.0.2"
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\"",
+    "ops:build": "node ops/build.mjs",
+    "dev:web": "npm run dev --workspace @relationflow/web",
+    "dev:api": "npm run start:dev --workspace @relationflow/api",
+    "build": "npm run build:web",
+    "build:web": "npm run build --workspace @relationflow/web",
+    "build:api": "npm run build --workspace @relationflow/api",
+    "typecheck": "npm run typecheck:web",
+    "typecheck:web": "npm run typecheck --workspace @relationflow/web",
+    "test": "npm run test:web",
+    "test:web": "npm run test --workspace @relationflow/web"
   },
   "devDependencies": {
-    "@types/d3-hierarchy": "^3.1.7",
-    "@types/node": "^22.19.19",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.11",
-    "vitest": "^2.1.8"
+    "concurrently": "^9.2.1"
   }
 }

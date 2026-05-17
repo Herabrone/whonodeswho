@@ -1,177 +1,145 @@
-# RelationFlow — Architecture & Parallel Build Plan
+# RelationFlow — Architecture
 
-A personal relationship graph app: people are nodes, relationships are colored
-edges, and the app helps you explore your network (focus mode, degrees of
-separation, filtering).
+## Repo layout
 
-This document is the **master plan**. Read it first. It explains how the build
-is split so that three coding agents (Copilot / Codex) can work **in parallel**
-without colliding.
-
----
-
-## 1. The parallelization model
-
-You cannot parallelize *everything* — if three agents each invent their own
-`Person` type and store, you get merge hell. So the build is:
+This is a TypeScript npm workspace. All source lives under `apps/` and
+`packages/`; the workspace root holds only orchestration config.
 
 ```
-        ┌─────────────────────────────┐
-        │  PHASE 0 — FOUNDATION        │   (blocking, build first, DONE)
-        │  types · store · canvas ·    │
-        │  graph algorithms · stubs    │
-        └──────────────┬──────────────┘
-                       │  freeze the contracts
-        ┌──────────────┼──────────────┐
-        ▼              ▼              ▼
-   ┌─────────┐   ┌───────────┐   ┌────────────┐
-   │ TRACK A │   │  TRACK B  │   │  TRACK C   │   (fully parallel)
-   │ CRUD &  │   │  Graph    │   │ Filtering  │
-   │ Data    │   │ Intelligence│ │ & Search   │
-   └─────────┘   └───────────┘   └────────────┘
+apps/
+  web/          React 18 + Vite + Tailwind + React Flow + Zustand (frontend)
+  api/          NestJS + Prisma + SQLite (backend, runs on :3000 locally)
+packages/
+  contracts/    Shared TypeScript types consumed by both apps
+docs/           Architecture and feature track specs
 ```
 
-**Phase 0 is already built** (this repo). It is the contract layer. Once you
-accept it, Tracks A/B/C can run at the same time because each one:
+## Running locally
 
-- works **only inside its own folder** (`src/features/<track>/`),
-- integrates **only through the store** (`src/store/useGraphStore.ts`) and the
-  graph primitives (`src/lib/graph.ts`),
-- renders into its **own reserved screen region** (no shared layout).
-
-Result: near-zero merge conflict. The store is the single integration point,
-and no track edits it.
-
----
-
-## 2. The three tracks
-
-| Track | Owns folder | Scope | Spec |
-|------|-------------|-------|------|
-| **A — CRUD & Data** | `src/features/crud/` | Add/edit/delete people & relationships, detail panels, JSON + CSV import/export | `track-a-crud-data.md` |
-| **B — Graph Intelligence** | `src/features/intelligence/` | Focus mode (1/2/3/all degrees), degrees-of-separation path finder | `track-b-graph-intelligence.md` |
-| **C — Filtering & Search** | `src/features/filtering/` | Category filters, label toggle, hide-weak, people search, reset view | `track-c-filtering-search.md` |
-
-Each track replaces its stub `index.tsx` and may add any files **under its own
-folder only**.
-
----
-
-## 3. File ownership map — THE RULES
-
-| Path | Owner | Other tracks may… |
-|------|-------|-------------------|
-| `src/types.ts` | Phase 0 — **frozen** | read/import only |
-| `src/constants.ts` | Phase 0 — **frozen** | read/import only |
-| `src/lib/graph.ts` | Phase 0 — **frozen** | read/import only |
-| `src/store/**` | Phase 0 — **frozen** | call actions, read state — never edit |
-| `src/graph/**` | Phase 0 — **frozen** | never edit (canvas reacts to store) |
-| `src/components/AppShell.tsx` | Phase 0 — **frozen** | never edit |
-| `src/App.tsx` | Phase 0 — **frozen** | never edit |
-| `src/features/crud/**` | Track A | A only |
-| `src/features/intelligence/**` | Track B | B only |
-| `src/features/filtering/**` | Track C | C only |
-
-**Frozen** means: do not change the shape of an existing type, action, or
-function. Additive-only changes (a new optional field, a new action) are
-allowed **only by explicit agreement** and must be made in a separate, merged
-"contract amendment" commit *before* tracks consume them — never silently
-inside a track branch.
-
-If a track believes it needs a contract change, it must stop and request it
-rather than editing a frozen file on its own branch.
-
----
-
-## 4. The integration contract
-
-Everything a track needs to touch the rest of the app:
-
-### 4.1 Store — `src/store/useGraphStore.ts`
-A single Zustand store. All state slices and actions already exist. Tracks
-**call actions** and **read state**; they never add logic to this file.
-
-- Data (Track A drives): `addPerson`, `updatePerson`, `deletePerson`,
-  `addRelationship`, `updateRelationship`, `deleteRelationship`,
-  `replaceGraph`, `setPosition`.
-- Selection (canvas drives, any track reads): `selectedPersonId`,
-  `selectedRelationshipId`, `selectPerson`, `selectRelationship`,
-  `clearSelection`.
-- View (Track C drives): `visibleCategories`, `showLabels`, `hideWeak`,
-  `searchQuery`, `toggleCategory`, `setVisibleCategories`, `setShowLabels`,
-  `setHideWeak`, `setSearchQuery`, `resetView`.
-- Focus (Track B drives): `focusPersonId`, `focusDegrees`, `pathPersonIds`,
-  `setFocus`, `setFocusDegrees`, `clearFocus`, `setPath`, `clearPath`.
-
-Selectors exported: `selectPersonById`, `selectRelationshipById`,
-`selectRelationshipsOf`.
-
-### 4.2 Graph primitives — `src/lib/graph.ts`
-Pure functions: `buildAdjacency`, `getNeighbors`, `getNodesWithinDegrees`,
-`findShortestPath`, `pathEdgeIds`, `autoLayout`. Track B builds its features on
-top of these.
-
-### 4.3 The canvas reacts automatically
-`src/graph/useGraphView.ts` derives the rendered nodes/edges from store state.
-When Track B sets `focusPersonId`/`pathPersonIds` or Track C sets
-`visibleCategories`/`showLabels`/`hideWeak`/`searchQuery`, the canvas restyles
-itself. **No track ever touches the canvas.**
-
-### 4.4 Reserved screen regions (no layout collisions)
-Each feature mounts as an absolute overlay in its own region:
-
-```
-┌────────────────────────────────────────────────────┐
-│ [Track C: search + filter toggle]   [Track A: +Add] │
-│                                                      │
-│  Track C                                  Track A    │
-│  filter drawer        GRAPH CANVAS         detail     │
-│  (left)                                    drawer     │
-│                                            (right)    │
-│            [Track B: focus + path bar]               │
-└────────────────────────────────────────────────────┘
-Modals (Track A forms, Track B picker): centered, z-40.
+```bash
+npm install                                        # installs all workspaces
+npm run prisma:push --workspace @relationflow/api  # creates apps/api/dev.db
+npm run dev                                        # starts web (:5173) + api (:3000)
 ```
 
-z-index bands: canvas 0 · overlays 20 · drawers 30 · modals 40.
+## Frontend — `apps/web`
 
----
+React single-page app built with Vite. State lives in a Zustand store
+(`src/store/useGraphStore.ts`). All persistence goes through the
+`RelationshipStore` interface (`src/store/persistence.ts`), currently backed by
+`HttpStore` which calls the backend API. Auth is managed by `AuthContext`, which
+bootstraps by calling `GET /auth/me` and exposes `signIn`, `signUp`, and
+`signOut` actions backed by the NestJS session endpoints.
 
-## 5. Workflow for running three agents
+**Key files:**
 
-1. **Merge Phase 0 to `main`.** Verify: `npm install && npm run build && npm test`.
-2. Create three branches: `track-a`, `track-b`, `track-c`.
-3. Give each agent: this file + its own track spec + the repo.
-4. Each agent works only in its folder, opens a PR.
-5. Merges are independent and conflict-free (different folders + frozen
-   contracts). Merge order does not matter.
-6. After all three merge, run the **integration checklist** in §6.
+| File | Purpose |
+|------|---------|
+| `src/types.ts` | Re-exports from `@relationflow/contracts`; keeps old import paths working |
+| `src/store/useGraphStore.ts` | Zustand store — all tracks integrate here |
+| `src/store/persistence.ts` | Async `RelationshipStore` interface |
+| `src/store/httpStore.ts` | HTTP implementation of `RelationshipStore` |
+| `src/auth/AuthContext.tsx` | Auth provider, session bootstrap, sign-in/up/out |
+| `src/auth/AuthGuard.tsx` | Loading/login/app gate |
 
----
+## Backend — `apps/api`
 
-## 6. MVP definition of done
+NestJS REST API. Modules: `AuthModule`, `GraphModule`, `HealthModule`,
+`PrismaModule`. Authentication uses server-side sessions backed by
+`express-session`; session cookies are `httpOnly`, `sameSite: lax`. All
+`/graph/*` routes are guarded by `SessionAuthGuard`.
 
-The MVP is complete when, on `main`:
+**Endpoints:**
 
-- [ ] `npm run build` and `npm test` pass.
-- [ ] You can add/edit/delete a person and a relationship (Track A).
-- [ ] Clicking a node/edge opens a detail panel (Track A).
-- [ ] JSON export then re-import reproduces the graph (Track A).
-- [ ] CSV import/export works (Track A).
-- [ ] Selecting a person and choosing 1/2/3/all degrees dims the rest of the
-      graph (Track B).
-- [ ] Degrees-of-separation between two people highlights the shortest path
-      and shows a textual explanation (Track B).
-- [ ] Category filters, label toggle, hide-weak, and search all visibly affect
-      the canvas (Track C).
-- [ ] Reset view restores the default state (Track C).
-- [ ] State survives a page reload (Phase 0 persistence).
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/health` | none | Health check |
+| POST | `/auth/register` | none | Create account + set session |
+| POST | `/auth/login` | none | Verify credentials + set session |
+| GET | `/auth/me` | none | Return current user or `null` |
+| POST | `/auth/logout` | session | Destroy session |
+| GET | `/graph` | session | Load user's full graph snapshot |
+| PUT | `/graph` | session | Save user's full graph snapshot |
+| DELETE | `/graph` | session | Reset user's graph to empty |
 
----
+**Key files:**
 
-## 7. Tech stack
+| File | Purpose |
+|------|---------|
+| `prisma/schema.prisma` | Single `User` model; graph stored as JSON columns |
+| `src/auth/auth.service.ts` | Register, login, getCurrentUser |
+| `src/auth/auth.controller.ts` | Session endpoint handlers |
+| `src/auth/session-auth.guard.ts` | Route guard that checks `req.session.userId` |
+| `src/graph/graph.service.ts` | Load, save, clear graph + server-side first-run seed |
+| `src/graph/graph.controller.ts` | Graph endpoint handlers |
 
-React 18 + TypeScript · Vite · Tailwind CSS · React Flow (`@xyflow/react`) ·
-Zustand · Vitest. Persistence is `localStorage` behind an async
-`RelationshipStore` interface — swapping to Supabase later means writing one
-new class (see `phase-0-foundation.md` §6).
+## Shared contracts — `packages/contracts`
+
+Pure TypeScript, no runtime dependencies. Exports the frozen domain types
+(`Person`, `Relationship`, `GraphData`, `PersistedState`, etc.) and auth
+response shapes. Both apps import these shared contracts from
+`@relationflow/contracts`.
+
+**Do not add React or NestJS imports here.**
+
+## Data flow
+
+```
+Browser                Backend               Database
+  |                      |                      |
+  |-- POST /auth/login -->|                      |
+  |<-- { user } ---------| bcrypt.compare ------>|
+  |                       |<--- user row ---------|
+  |
+  |-- GET /graph -------->|
+  |                       |-- SELECT user ------->|
+  |<-- PersistedState ----|<--- JSON columns ------|
+  |
+  |-- PUT /graph -------->|
+  |                       |-- UPDATE user ------->|
+  |<-- PersistedState ----|<--- updated row -------|
+```
+
+## Persistence contract
+
+The store only ever talks to persistence through the `RelationshipStore`
+interface (`load / save / clear`). Swapping the backend (e.g. to PostgreSQL, or
+adding real-time sync) means writing a new implementation; the store and UI do
+not change.
+
+## Type contract
+
+`packages/contracts/src/index.ts` is the integration boundary. Both apps import
+types from `@relationflow/contracts`. The frontend `src/types.ts` is a thin
+re-export that keeps existing `../types` import paths working without a
+mass-rename.
+
+**Rules:**
+- Add new shared types to `packages/contracts/src/index.ts` only.
+- `src/types.ts` must stay a pure re-export; no logic here.
+- The backend must never import from `apps/web`.
+- The frontend must never import from `apps/api`.
+
+## Auth model
+
+Sessions are backed by `express-session` with a server-side session store.
+Cookies are `httpOnly` and `sameSite: lax`. The frontend never sees or stores a
+raw token. On page load, `AuthContext` calls `GET /auth/me`; if it returns a
+user the app hydrates the graph immediately.
+
+## First-run experience
+
+When a new account is registered (`POST /auth/register`), the backend writes the
+full demo seed graph into the user's row before returning. This means every new
+user gets the same starting graph regardless of which device they register from.
+
+## Feature tracks
+
+Three feature areas are built inside `src/features/` and integrate only through
+the Zustand store. No feature track may edit the store file directly.
+
+| Track | Directory | What it owns |
+|-------|-----------|--------------|
+| A — CRUD | `src/features/crud/` | Add/edit/delete people & relationships, JSON/CSV import-export |
+| B — Intelligence | `src/features/intelligence/` | Focus mode, degrees of separation |
+| C — Filtering | `src/features/filtering/` | Category filters, search, reset view |

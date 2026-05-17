@@ -4,25 +4,45 @@ A personal relationship graph app — map people as nodes and their
 relationships as colored edges, then explore your network with focus mode and
 degrees-of-separation pathfinding.
 
-Built with React 18 · TypeScript · Vite · Tailwind CSS · React Flow
-(`@xyflow/react`) · Zustand.
+Built as a local TypeScript workspace with React 18 · Vite · Tailwind CSS ·
+React Flow (`@xyflow/react`) on the frontend and NestJS + Prisma + SQLite on
+the backend.
 
 ## Quick start
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173 — loads a seeded demo graph
-npm run build      # production build
-npm run typecheck  # tsc -b
-npm test           # vitest
+npm run dev        # web: http://localhost:5173, api: http://localhost:3000
+npm run build:web  # frontend production build
+npm run build:api  # backend production build
+npm run typecheck  # frontend typecheck
+npm test           # frontend vitest suite
+./ops/build dev    # orchestrated local run (web on http://localhost:3005)
+./ops/build prod   # orchestrated production-style run (web on http://localhost:3005)
 ```
+
+The `build` wrapper script handles startup orchestration for both modes:
+- forces frontend to use port `3005`
+- checks required ports and stops existing processes on those ports
+- waits for API (`/health`) and frontend HTTP health checks before reporting ready
+
+## Local backend
+
+The backend lives in `apps/api` and uses Prisma with a local SQLite database.
+The database file is created automatically at `apps/api/dev.db` when you run:
+
+```bash
+npm run prisma:push --workspace @relationflow/api
+```
+
+The root `npm run dev` command starts both the web app and API together.
 
 ## Project status
 
-This repo is **Phase 0 — the foundation**. It is complete and runnable: the
-graph canvas, store, persistence, types, and graph algorithms all work, and a
-seeded demo graph loads on first run. Three features are stubbed and built in
-parallel as Tracks A, B, and C.
+This repo is currently in the middle of a frontend-only to full-stack workspace
+migration. The web app, backend scaffold, local auth flow, and backend graph
+persistence are in place. Some docs still reflect the original Phase 0
+frontend-only layout and will be updated as the migration continues.
 
 ## How this project is built — read the docs
 
@@ -44,11 +64,10 @@ its own track doc.
 ## Layout
 
 ```
-src/
-  types.ts         constants.ts       — frozen contracts
-  lib/graph.ts                        — graph algorithms (BFS, degrees, layout)
-  store/                              — Zustand store + localStorage persistence
-  graph/                              — React Flow canvas (reacts to store)
-  features/crud · intelligence · filtering   — the three parallel tracks
+apps/
+  web/                                — React + Zustand frontend
+  api/                                — NestJS + Prisma backend
+packages/
+  contracts/                          — shared graph and auth contracts
 docs/                                 — the plan and per-track specs
 ```

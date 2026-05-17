@@ -31,8 +31,8 @@ import {
   RELATIONSHIP_CATALOG,
 } from "../constants";
 import { newId, nowIso } from "../lib/id";
-import { persistenceStore } from "./localStorageStore";
-import { EMPTY_STATE } from "./persistence";
+import { createPersistenceStore } from "./localStorageStore";
+import { EMPTY_STATE, type RelationshipStore } from "./persistence";
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -77,6 +77,7 @@ interface LayoutSlice {
 
 interface Lifecycle {
   hydrated: boolean;
+  _persistence: RelationshipStore | null;
 }
 
 export interface GraphStore
@@ -87,7 +88,8 @@ export interface GraphStore
     LayoutSlice,
     Lifecycle {
   // -- lifecycle --
-  hydrate: () => Promise<void>;
+  hydrate: (userId: string) => Promise<void>;
+  signOut: () => void;
 
   // -- data actions (Track A) --
   addPerson: (input: PersonInput) => Person;
@@ -138,9 +140,12 @@ export interface GraphStore
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleSave(get: () => GraphStore) {
   if (saveTimer) clearTimeout(saveTimer);
+  const persistence = get()._persistence;
+  if (!persistence) return;
+
   saveTimer = setTimeout(() => {
     const s = get();
-    void persistenceStore.save({
+    void persistence.save({
       graph: { people: s.people, relationships: s.relationships },
       positions: s.positions,
       layout: {
@@ -189,10 +194,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   focusDegrees: 1,
   pathPersonIds: [],
   hydrated: false,
+  _persistence: null,
 
   // -- lifecycle --
-  hydrate: async () => {
-    const persisted = await persistenceStore.load().catch(() => EMPTY_STATE);
+  hydrate: async (userId: string) => {
+    const store = createPersistenceStore(userId);
+    const persisted = await store.load().catch(() => EMPTY_STATE);
     set({
       people: persisted.graph.people,
       relationships: persisted.graph.relationships,
@@ -201,6 +208,21 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       treeShape: persisted.layout?.treeShape ?? LAYOUT_DEFAULTS.treeShape,
       treeRootId: persisted.layout?.treeRootId ?? LAYOUT_DEFAULTS.treeRootId,
       hydrated: true,
+      _persistence: store,
+    });
+  },
+
+  signOut: () => {
+    set({
+      people: [],
+      relationships: [],
+      positions: {},
+      selectedPersonId: null,
+      selectedRelationshipId: null,
+      focusPersonId: null,
+      pathPersonIds: [],
+      hydrated: false,
+      _persistence: null,
     });
   },
 
