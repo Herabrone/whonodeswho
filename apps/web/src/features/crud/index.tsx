@@ -20,6 +20,8 @@ import {
   type OpenRelationshipComposerDetail,
 } from "./relationshipComposerEvent";
 import { YearMonthPicker } from "../timeline/YearMonthPicker";
+import useAutoRelationships, { createRelationshipKey } from "./useAutoRelationships";
+import ConfirmRelationshipsDialog, { ProposalItem } from "./ConfirmRelationshipsDialog";
 
 type ModalState =
   | { type: "none" }
@@ -65,6 +67,10 @@ function capitalizeWords(value: string): string {
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function proposalKey(proposal: Pick<ProposalItem, "source" | "target" | "type">): string {
+  return createRelationshipKey(proposal.source, proposal.target, proposal.type);
 }
 
 function initialPersonDraft(person?: Person): PersonDraft {
@@ -168,6 +174,10 @@ export function CrudFeature() {
   const [relationshipDraft, setRelationshipDraft] = useState<RelationshipDraft>(initialRelationshipDraft());
   const [relationshipError, setRelationshipError] = useState("");
   const [endConfirmId, setEndConfirmId] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmPrimary, setConfirmPrimary] = useState<ProposalItem | null>(null);
+  const [confirmProposals, setConfirmProposals] = useState<ProposalItem[]>([]);
+  const [declinedProposalKeys, setDeclinedProposalKeys] = useState<Set<string>>(() => new Set());
 
   const jsonInputRef = useRef<HTMLInputElement | null>(null);
   const csvPeopleInputRef = useRef<HTMLInputElement | null>(null);
@@ -266,6 +276,17 @@ export function CrudFeature() {
     setEndConfirmId(null);
   };
 
+  const rememberDeclinedProposals = (proposals: ProposalItem[]) => {
+    if (proposals.length === 0) return;
+    setDeclinedProposalKeys((prev) => {
+      const next = new Set(prev);
+      for (const proposal of proposals) {
+        next.add(proposalKey(proposal));
+      }
+      return next;
+    });
+  };
+
   const submitPerson = () => {
     const trimmedName = personDraft.name.trim();
     if (!trimmedName) {
@@ -320,10 +341,88 @@ export function CrudFeature() {
 
     if (modal.type === "relationship-edit") {
       updateRelationship(modal.relationship.id, payload);
+      closeModal();
     } else {
-      addRelationship(payload);
+      const generatedProposals = useAutoRelationships(
+        payload.type,
+        payload.source,
+        payload.target,
+        payload.category,
+        people,
+        relationships,
+      );
+      const proposals = generatedProposals.filter(
+        (proposal) => !declinedProposalKeys.has(proposalKey(proposal)),
+      );
+
+      if (!proposals || proposals.length === 0) {
+        // No new heuristic suggestions: persist primary relationship immediately.
+        addRelationship(payload);
+        closeModal();
+      } else {
+        setConfirmPrimary(payload as ProposalItem);
+        setConfirmProposals(proposals.map((p) => ({ ...p })));
+        setConfirmOpen(true);
+      }
     }
-    closeModal();
+  };
+
+  const handleConfirmAddAll = (selected: ProposalItem[], declined: ProposalItem[]) => {
+    rememberDeclinedProposals(declined);
+    if (confirmPrimary) {
+      addRelationship({
+        source: confirmPrimary.source,
+        target: confirmPrimary.target,
+        category: confirmPrimary.category,
+        type: confirmPrimary.type,
+        direction: confirmPrimary.direction,
+        color: undefined,
+        notes: confirmPrimary.notes || undefined,
+      });
+    }
+    for (const p of selected) {
+      addRelationship({
+        source: p.source,
+        target: p.target,
+        category: p.category,
+        type: p.type,
+        direction: p.direction,
+        color: undefined,
+        notes: p.notes || undefined,
+      });
+    }
+    setConfirmOpen(false);
+    setConfirmPrimary(null);
+    setConfirmProposals([]);
+    setModal({ type: "none" });
+  };
+
+  const handleAddPrimaryOnly = (_declined: ProposalItem[]) => {
+    // Do NOT remember declined proposals here — the user clicked "Skip suggestions"
+    // which means "just add the primary relationship now". Proposals for future
+    // relationships involving these people should still surface normally.
+    if (confirmPrimary) {
+      addRelationship({
+        source: confirmPrimary.source,
+        target: confirmPrimary.target,
+        category: confirmPrimary.category,
+        type: confirmPrimary.type,
+        direction: confirmPrimary.direction,
+        color: undefined,
+        notes: confirmPrimary.notes || undefined,
+      });
+    }
+    setConfirmOpen(false);
+    setConfirmPrimary(null);
+    setConfirmProposals([]);
+    setModal({ type: "none" });
+  };
+
+  const handleCancelConfirm = () => {
+    // Keep the relationship composer open so the user can revise the primary relationship.
+    setConfirmOpen(false);
+    setConfirmPrimary(null);
+    setConfirmProposals([]);
   };
 
   const exportJson = () => {
@@ -1096,6 +1195,17 @@ export function CrudFeature() {
             {importMessage && <p className="mt-3 text-sm text-rf-muted">{importMessage}</p>}
           </div>
         </div>
+      )}
+      {confirmOpen && confirmPrimary && (
+        <ConfirmRelationshipsDialog
+          open={confirmOpen}
+          primary={confirmPrimary}
+          proposals={confirmProposals}
+          people={people}
+          onCancel={handleCancelConfirm}
+          onAddAll={handleConfirmAddAll}
+          onAddPrimaryOnly={handleAddPrimaryOnly}
+        />
       )}
     </>
   );

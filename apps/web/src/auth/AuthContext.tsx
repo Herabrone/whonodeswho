@@ -8,6 +8,7 @@ interface AuthContextValue extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  devSignIn: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,6 +96,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useGraphStore.getState().signOut();
   };
 
+  const devSignIn = async () => {
+    setState((s) => ({ ...s, error: null }));
+    try {
+      const response = await apiPost<AuthSessionResponse>("/auth/dev-login");
+      setState({ user: response.user, loading: false, error: null });
+    } catch (error) {
+      setState((s) => ({
+        ...s,
+        error: error instanceof Error ? error.message : "Dev login failed.",
+      }));
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -102,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
+        devSignIn,
       }}
     >
       {children}

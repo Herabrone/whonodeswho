@@ -65,7 +65,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
               }`}
               onClick={() => setLayoutMode("free")}
             >
-              Free
+              Web
             </button>
             <button
               type="button"

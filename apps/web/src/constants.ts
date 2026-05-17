@@ -57,6 +57,17 @@ export const RELATIONSHIP_CATALOG: Record<RelationshipCategory, string[]> = {
     "aunt/uncle",
     "niece/nephew",
     "cousin",
+    // Step and half family
+    "step-parent",
+    "step-child",
+    "step-sibling",
+    "half-sibling",
+    // In-laws (directional — source role listed first)
+    "parent-in-law",
+    "child-in-law",
+    "sibling-in-law",
+    "grandparent-in-law",
+    "grandchild-in-law",
   ],
   friend: ["friend", "close friend", "best friend", "acquaintance"],
   romantic: ["partner", "spouse", "ex-partner", "ex-spouse"],

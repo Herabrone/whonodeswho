@@ -131,6 +131,14 @@ export function useGraphView(): GraphView {
       layoutMode === "tree" && treeRootId !== null && people.some((p) => p.id === treeRootId);
     const groupedTreeActive = treeActive && treeShape === "grouped";
 
+    const capitalizeLabel = (s: string | undefined) =>
+      !s || s.length === 0
+        ? s ?? s
+        : s
+            .split(" ")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+
     if (groupedTreeActive && treeRootId) {
       const layout = computeCategoryTree(graph, treeRootId);
       const query = searchQuery.trim().toLowerCase();
@@ -236,59 +244,58 @@ export function useGraphView(): GraphView {
           },
         })),
         ...layout.personEdges.flatMap((edge) => {
-            const relationship = relationshipsById.get(edge.originalRelationshipId);
-            const timelineState = getTimelineRelationshipState(
-              timelineOpen,
-              timelineYear,
-              relationship,
-            );
-            if (timelineState.hidden) return [];
+          const relationship = relationshipsById.get(edge.originalRelationshipId);
+          const timelineState = getTimelineRelationshipState(
+            timelineOpen,
+            timelineYear,
+            relationship,
+          );
+          if (timelineState.hidden) return [];
 
-            visibleTimelineNodeIds.add(edge.source);
-            visibleTimelineNodeIds.add(edge.target);
+          visibleTimelineNodeIds.add(edge.source);
+          visibleTimelineNodeIds.add(edge.target);
 
-            const color = relationshipColors[edge.category] ?? CATEGORY_COLORS[edge.category];
-            const style = timelineState.ended
-              ? {
-                  stroke: graphTokens.edge.endedColor,
-                  strokeWidth: graphTokens.edge.widthEnded,
-                  opacity: timelineState.opacity ?? graphTokens.edge.endedOpacity,
-                  strokeDasharray: graphTokens.edge.endedDash,
-                }
-              : {
-                  stroke: color,
-                  strokeWidth: graphTokens.edge.width,
-                  opacity: timelineState.opacity ?? 1,
-                };
+          const color = relationshipColors[edge.category] ?? CATEGORY_COLORS[edge.category];
+          const style = timelineState.ended
+            ? {
+                stroke: graphTokens.edge.endedColor,
+                strokeWidth: graphTokens.edge.widthEnded,
+                opacity: timelineState.opacity ?? graphTokens.edge.endedOpacity,
+                strokeDasharray: graphTokens.edge.endedDash,
+              }
+            : {
+                stroke: color,
+                strokeWidth: graphTokens.edge.width,
+                opacity: timelineState.opacity ?? 1,
+              };
 
-            return [{
-              id: edge.id,
-              source: edge.source,
-              target: edge.target,
-              sourceHandle: "cat-b",
-              targetHandle: "t",
-              type: "relationship",
-              label: edge.relationshipType,
-              data: {
-                layoutMode,
-                treeShape,
-              },
-              style,
-              labelStyle: {
-                fill: "var(--rf-graph-node-text)",
-                fontSize: 11,
-                fontWeight: 500,
-                opacity: style.opacity ?? 1,
-              },
-              labelBgStyle: {
-                fill: "var(--rf-graph-node-bg)",
-                opacity: timelineState.ended ? 0.35 : 0.85,
-              },
-              labelBgPadding: [4, 2] as [number, number],
-              labelBgBorderRadius: 4,
-            } satisfies Edge];
-          })
-          ,
+          return [{
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: "cat-b",
+            targetHandle: "t",
+            type: "relationship",
+            label: capitalizeLabel(edge.relationshipType),
+            data: {
+              layoutMode,
+              treeShape,
+            },
+            style,
+            labelStyle: {
+              fill: "var(--rf-graph-node-text)",
+              fontSize: 11,
+              fontWeight: 500,
+              opacity: style.opacity ?? 1,
+            },
+            labelBgStyle: {
+              fill: "var(--rf-graph-node-bg)",
+              opacity: timelineState.ended ? 0.35 : 0.85,
+            },
+            labelBgPadding: [4, 2] as [number, number],
+            labelBgBorderRadius: 4,
+          } satisfies Edge];
+        }),
       ];
 
       for (const node of nodes) {
@@ -297,6 +304,82 @@ export function useGraphView(): GraphView {
         const treeNodeVisible =
           visibleTimelineNodeIds.has(node.id) || visibleTimelineNodeIds.has(personId);
         node.data.dimmed = node.data.dimmed || !treeNodeVisible;
+      }
+
+      try {
+        const nodePos = new Map(nodes.map((node) => [node.id, node.position]));
+        const candidates: {
+          edgeIndex: number;
+          edge: Edge;
+          baseX: number;
+          baseY: number;
+          width: number;
+          height: number;
+        }[] = [];
+
+        edges.forEach((edge, i) => {
+          if (!edge.label || typeof edge.label !== "string") return;
+          const src = nodePos.get(edge.source as string);
+          const tgt = nodePos.get(edge.target as string);
+          if (!src || !tgt) return;
+          const baseX = (src.x + tgt.x) / 2;
+          const baseY = (src.y + tgt.y) / 2;
+          const fontSize = (edge as any).labelStyle?.fontSize ?? 11;
+          const [padX = 4, padY = 2] = (edge as any).labelBgPadding ?? [4, 2];
+          const charWidth = Math.max(6, fontSize * 0.6);
+          const text = String(edge.label);
+          const width = Math.max(24, text.length * charWidth) + padX * 2;
+          const height = fontSize + padY * 2;
+          candidates.push({ edgeIndex: i, edge, baseX, baseY, width, height });
+        });
+
+        function rectsIntersect(a: { baseX: number; baseY: number; width: number; height: number }, b: { baseX: number; baseY: number; width: number; height: number }) {
+          const ax1 = a.baseX - a.width / 2;
+          const ax2 = a.baseX + a.width / 2;
+          const ay1 = a.baseY - a.height / 2;
+          const ay2 = a.baseY + a.height / 2;
+          const bx1 = b.baseX - b.width / 2;
+          const bx2 = b.baseX + b.width / 2;
+          const by1 = b.baseY - b.height / 2;
+          const by2 = b.baseY + b.height / 2;
+          return ax1 < bx2 && ax2 > bx1 && ay1 < by2 && ay2 > by1;
+        }
+
+        const visited = new Array(candidates.length).fill(false);
+        for (let i = 0; i < candidates.length; i++) {
+          if (visited[i]) continue;
+          const stack = [i];
+          const component: number[] = [];
+          visited[i] = true;
+
+          while (stack.length > 0) {
+            const current = stack.pop()!;
+            component.push(current);
+            for (let j = 0; j < candidates.length; j++) {
+              if (!visited[j] && rectsIntersect(candidates[current], candidates[j])) {
+                visited[j] = true;
+                stack.push(j);
+              }
+            }
+          }
+
+          if (component.length <= 1) continue;
+
+          component.sort((a, b) => candidates[a].baseY - candidates[b].baseY);
+          const maxHeight = Math.max(...component.map((idx) => candidates[idx].height));
+          const spacing = Math.max(14, maxHeight + 4);
+          for (let k = 0; k < component.length; k++) {
+            const candidate = candidates[component[k]];
+            const offset = (k - (component.length - 1) / 2) * spacing;
+            (candidate.edge.data as Record<string, unknown>) = {
+              ...(candidate.edge.data as Record<string, unknown> | undefined),
+              labelShiftPx: offset,
+            };
+            edges[candidate.edgeIndex] = candidate.edge;
+          }
+        }
+      } catch {
+        // ignore label collision fallback failures in grouped mode
       }
 
       let groupedDivider: GraphView["groupedDivider"] = null;
@@ -336,7 +419,13 @@ export function useGraphView(): GraphView {
 
     const query = searchQuery.trim().toLowerCase();
     const visible = new Set(visibleCategories);
-
+    const capitalizeLabelGlobal = (s: string | undefined) =>
+      !s || s.length === 0
+        ? s ?? s
+        : s
+            .split(" ")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
     const edges: Edge[] = relationships
       .filter((r) => visible.has(r.category))
       .filter((r) => !(hideWeak && WEAK_RELATIONSHIP_TYPES.has(r.type)))
@@ -382,7 +471,7 @@ export function useGraphView(): GraphView {
           source: r.source,
           target: r.target,
           type: "relationship",
-          label: showLabels ? r.type : undefined,
+          label: showLabels ? capitalizeLabelGlobal(r.type) : undefined,
           selected: selectedRelationshipId === r.id,
           data: {
             layoutMode,
@@ -449,6 +538,83 @@ export function useGraphView(): GraphView {
         },
       };
     });
+
+    // Basic label collision avoidance for general layout branch
+    try {
+      const nodePos = new Map(nodes.map((n) => [n.id, n.position]));
+      const candidates: {
+        edgeIndex: number;
+        edge: Edge;
+        baseX: number;
+        baseY: number;
+        width: number;
+        height: number;
+      }[] = [];
+
+      edges.forEach((edge, i) => {
+        if (!edge.label || typeof edge.label !== "string") return;
+        const src = nodePos.get(edge.source as string);
+        const tgt = nodePos.get(edge.target as string);
+        if (!src || !tgt) return;
+        const baseX = (src.x + tgt.x) / 2;
+        const baseY = (src.y + tgt.y) / 2;
+        const fontSize = (edge as any).labelStyle?.fontSize ?? 11;
+        const [padX = 4, padY = 2] = (edge as any).labelBgPadding ?? [4, 2];
+        const charWidth = Math.max(6, fontSize * 0.6);
+        const text = String(edge.label);
+        const width = Math.max(24, text.length * charWidth) + padX * 2;
+        const height = fontSize + padY * 2;
+        candidates.push({ edgeIndex: i, edge, baseX, baseY, width, height });
+      });
+
+      function rectsIntersect(a: any, b: any) {
+        const ax1 = a.baseX - a.width / 2;
+        const ax2 = a.baseX + a.width / 2;
+        const ay1 = a.baseY - a.height / 2;
+        const ay2 = a.baseY + a.height / 2;
+        const bx1 = b.baseX - b.width / 2;
+        const bx2 = b.baseX + b.width / 2;
+        const by1 = b.baseY - b.height / 2;
+        const by2 = b.baseY + b.height / 2;
+        return ax1 < bx2 && ax2 > bx1 && ay1 < by2 && ay2 > by1;
+      }
+
+      const n = candidates.length;
+      const visited = new Array(n).fill(false);
+      for (let i = 0; i < n; i++) {
+        if (visited[i]) continue;
+        const stack = [i];
+        const comp: number[] = [];
+        visited[i] = true;
+        while (stack.length > 0) {
+          const cur = stack.pop()!;
+          comp.push(cur);
+          for (let j = 0; j < n; j++) {
+            if (!visited[j] && rectsIntersect(candidates[cur], candidates[j])) {
+              visited[j] = true;
+              stack.push(j);
+            }
+          }
+        }
+
+        if (comp.length <= 1) continue;
+        comp.sort((a, b) => candidates[a].baseY - candidates[b].baseY);
+        const maxHeight = Math.max(...comp.map((idx) => candidates[idx].height));
+        const spacing = Math.max(14, maxHeight + 4);
+        const count = comp.length;
+        for (let k = 0; k < count; k++) {
+          const candidate = candidates[comp[k]];
+          const offset = (k - (count - 1) / 2) * spacing;
+          (candidate.edge.data as any) = {
+            ...(candidate.edge.data as any),
+            labelShiftPx: offset,
+          };
+          edges[candidate.edgeIndex] = candidate.edge;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
 
     const radialLabels =
       treeActive && treeRootId && treeShape === "radial" && treeStructure && treePositions

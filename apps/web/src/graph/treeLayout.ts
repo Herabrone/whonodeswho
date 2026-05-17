@@ -9,12 +9,13 @@ const ORDERED_CATEGORIES: RelationshipCategory[] = [
   "other",
 ];
 
-const LEVEL_GAP = 130;
-const NODE_W = 90;
-const NODE_H = 36;
-const CAT_W = 90;
-const CAT_H = 36;
-const H_GAP = 16;
+// Increased spacing to reduce label overlap in grouped tree view
+const LEVEL_GAP = 170;
+const NODE_W = 110;
+const NODE_H = 44;
+const CAT_W = 110;
+const CAT_H = 44;
+const H_GAP = 28;
 const CAT_GROUP_GAP = H_GAP * 3;
 
 interface CategoryConnection {

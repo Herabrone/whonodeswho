@@ -9,7 +9,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const { signIn, signUp, error: authError } = useAuth();
+  const { signIn, signUp, devSignIn, error: authError } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,6 +143,30 @@ export function LoginPage() {
               ? "Don't have an account? Sign up"
               : "Already have an account? Sign in"}
           </button>
+
+          {import.meta.env.DEV && (
+            <div className="border-t border-line pt-4">
+              <p className="mb-2 text-center text-xs text-muted">Dev shortcut</p>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={async () => {
+                  setSubmitting(true);
+                  try {
+                    await devSignIn();
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                ) : null}
+                Dev login →
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

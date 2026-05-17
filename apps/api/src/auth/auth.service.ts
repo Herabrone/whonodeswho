@@ -59,6 +59,24 @@ export class AuthService {
     return user ? this.toAuthUser(user) : null;
   }
 
+  /** Dev-only: upserts a well-known dev account and returns it. */
+  async devLogin(): Promise<AuthUser> {
+    const email = 'dev@dev.local';
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) return this.toAuthUser(existing);
+
+    const passwordHash = await bcrypt.hash('dev', 10);
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        graphJson: JSON.stringify(SEED_GRAPH),
+        positionsJson: JSON.stringify(SEED_POSITIONS),
+      },
+    });
+    return this.toAuthUser(user);
+  }
+
   private toAuthUser(user: Pick<User, 'id' | 'email'>): AuthUser {
     return {
       id: user.id,

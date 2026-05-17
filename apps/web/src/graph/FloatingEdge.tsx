@@ -18,6 +18,7 @@ interface RelationshipEdgeData {
   secondary?: boolean;
   labelRank?: number;
   labelCount?: number;
+  labelShiftPx?: number;
 }
 
 interface NodeGeometry {
@@ -130,10 +131,12 @@ function FloatingEdgeComponent(props: EdgeProps) {
 
   const [path, labelX, baseLabelY] = pathResult;
   const labelShiftY =
-    edgeData?.layoutMode === "tree" &&
-    edgeData.treeShape === "grouped" &&
-    typeof edgeData.labelRank === "number" &&
-    typeof edgeData.labelCount === "number"
+    typeof edgeData?.labelShiftPx === "number"
+      ? edgeData.labelShiftPx
+      : edgeData?.layoutMode === "tree" &&
+        edgeData.treeShape === "grouped" &&
+        typeof edgeData.labelRank === "number" &&
+        typeof edgeData.labelCount === "number"
       ? (edgeData.labelRank - (edgeData.labelCount - 1) / 2) * 14
       : 0;
   const labelY = baseLabelY + labelShiftY;

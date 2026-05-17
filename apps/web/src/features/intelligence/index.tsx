@@ -48,7 +48,15 @@ export function IntelligenceFeature() {
       );
       const from = byId.get(a)?.name ?? "Unknown";
       const to = byId.get(b)?.name ?? "Unknown";
-      const label = relation?.type ?? "connected";
+      const capitalize = (t: string | undefined) =>
+        !t || t.length === 0
+          ? t ?? t
+          : t
+              .split(" ")
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(" ");
+
+      const label = capitalize(relation?.type ?? "connected");
       hops.push(`${from} -${label}-> ${to}`);
     }
     return hops;
@@ -87,55 +95,61 @@ export function IntelligenceFeature() {
       <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 w-[860px] max-w-[calc(100vw-2rem)] -translate-x-1/2">
         <div className="pointer-events-auto rounded-xl border border-rf-border bg-rf-surface p-3 shadow-lg backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={focusPersonId ?? ""}
-              onChange={(e) => {
-                const nextId = e.target.value;
-                if (!nextId) {
-                  clearFocus();
-                  return;
-                }
-                setFocus(nextId, focusDegrees);
-              }}
-              className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
-            >
-              <option value="">Focus off</option>
-              {people.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={focusPersonId ?? ""}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  if (!nextId) {
+                    clearFocus();
+                    return;
+                  }
+                  setFocus(nextId, focusDegrees);
+                }}
+                className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
+              >
+                <option value="">Focus off</option>
+                {people.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name}
+                  </option>
+                ))}
+              </select>
 
-            <div className="flex items-center rounded-lg border border-rf-border bg-rf-subtle p-1 text-xs">
-              {([
-                { label: "Direct", value: 1 as FocusDegrees },
-                { label: "2", value: 2 as FocusDegrees },
-                { label: "3", value: 3 as FocusDegrees },
-                { label: "All", value: "all" as FocusDegrees },
-              ]).map((item) => (
+              {focusPersonId ? (
                 <button
-                  key={String(item.value)}
-                  type="button"
-                  onClick={() => applyDegrees(item.value)}
-                  className={`rounded px-2 py-1 ${
-                    focusDegrees === item.value
-                      ? "bg-rf-accent text-white"
-                      : "text-rf-text hover:bg-rf-base"
-                  }`}
+                  aria-label="Clear focus"
+                  onClick={() => clearFocus()}
+                  className="rounded-full border border-rf-border bg-rf-subtle px-2 py-1 text-xs text-rf-muted hover:bg-rf-base hover:text-rf-text"
                 >
-                  {item.label}
+                  x
                 </button>
-              ))}
-            </div>
+              ) : null}
 
-            <button
-              type="button"
-              onClick={clearFocus}
-              className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
-            >
-              Clear focus
-            </button>
+              {focusPersonId ? (
+                <div className="flex items-center rounded-lg border border-rf-border bg-rf-subtle p-1 text-xs">
+                  {([
+                    { label: "Direct", value: 1 as FocusDegrees },
+                    { label: "2", value: 2 as FocusDegrees },
+                    { label: "3", value: 3 as FocusDegrees },
+                    { label: "All", value: "all" as FocusDegrees },
+                  ]).map((item) => (
+                    <button
+                      key={String(item.value)}
+                      type="button"
+                      onClick={() => applyDegrees(item.value)}
+                      className={`rounded px-2 py-1 ${
+                        focusDegrees === item.value
+                          ? "bg-rf-accent text-white"
+                          : "text-rf-text hover:bg-rf-base"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
 
             <button
               type="button"

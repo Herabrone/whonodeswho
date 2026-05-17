@@ -4,5 +4,6 @@ dist
 *.local
 .env
 apps/*/dist
+apps/api/prisma/dev.db*
 apps/api/dev.db
 apps/api/dev.db-journal
