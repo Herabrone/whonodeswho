@@ -107,21 +107,20 @@ export const categoryTokens: Record<RelationshipCategory, CategoryToken> = {
 
 export const graphTokens = {
   canvas: {
-    light: primitives.graphSpace[900],
+    light: primitives.neutral[50],
     dark: primitives.graphSpace[850],
-    gridDot: "rgba(255,255,255,0.055)",
     gridSpacing: "26px",
   },
   node: {
-    bgDefault: primitives.graphSpace[800],
+    bgDefault: primitives.neutral[0],
     bgDefaultDm: primitives.graphSpace[600],
-    bgRoot: primitives.graphSpace[700],
+    bgRoot: primitives.neutral[0],
     bgRootDm: primitives.graphSpace[500],
-    textPrimary: "rgba(255,255,255,0.88)",
-    textSecondary: "rgba(255,255,255,0.45)",
-    textDimmed: "rgba(255,255,255,0.18)",
+    textPrimary: primitives.neutral[900],
+    textSecondary: primitives.neutral[500],
+    textDimmed: primitives.neutral[300],
     accentWidth: "4px",
-    rootBorderColor: "rgba(255,255,255,0.22)",
+    rootBorderColor: primitives.neutral[300],
   },
   edge: {
     width: 1.8,
@@ -417,24 +416,9 @@ export function buildCssVars(): string {
     --rf-motion-spring: ${motion.easing.spring};
     --rf-motion-standard: ${motion.easing.standard};
     --rf-motion-panel: ${motion.duration.panel};
-    --rf-graph-canvas: ${graphTokens.canvas.light};
-    --rf-graph-grid-dot: ${graphTokens.canvas.gridDot};
-    --rf-graph-node-bg: ${graphTokens.node.bgDefault};
-    --rf-graph-node-root-bg: ${graphTokens.node.bgRoot};
-    --rf-graph-node-root-border: ${graphTokens.node.rootBorderColor};
-    --rf-graph-node-text: ${graphTokens.node.textPrimary};
-    --rf-graph-node-text-muted: ${graphTokens.node.textSecondary};
-    --rf-graph-node-dimmed: ${graphTokens.node.textDimmed};
     --rf-graph-node-accent-width: ${graphTokens.node.accentWidth};
     --rf-graph-edge-opacity: ${graphTokens.edge.opacity};
     --rf-graph-edge-dimmed: ${graphTokens.edge.dimmedOpacity};
-    --rf-graph-control-bg: ${graphTokens.control.bg};
-    --rf-graph-control-border: ${graphTokens.control.border};
-    --rf-graph-control-text: ${graphTokens.control.text};
-    --rf-graph-control-hover-bg: ${graphTokens.control.bgHover};
-    --rf-graph-control-hover-text: ${graphTokens.control.textHover};
-    --rf-graph-minimap-bg: ${graphTokens.minimap.bg};
-    --rf-graph-minimap-border: ${graphTokens.minimap.border};
     --rf-cat-family-ui: ${categoryTokens.family.ui};
     --rf-cat-family-gfx: ${categoryTokens.family.gfx};
     --rf-cat-family-subtle: ${categoryTokens.family.subtle};
@@ -487,6 +471,24 @@ export function buildCssVars(): string {
     --rf-shadow-lg: ${lightTokens.shadow.lg};
     --rf-shadow-panel: ${lightTokens.shadow.panel};
     --rf-shadow-top-dock: ${lightTokens.shadow.topDock};
+    --rf-graph-canvas: ${graphTokens.canvas.light};
+    --rf-graph-grid-dot: rgba(28,25,23,0.08);
+    --rf-graph-node-bg: ${graphTokens.node.bgDefault};
+    --rf-graph-node-root-bg: ${graphTokens.node.bgRoot};
+    --rf-graph-node-root-border: ${graphTokens.node.rootBorderColor};
+    --rf-graph-node-text: ${graphTokens.node.textPrimary};
+    --rf-graph-node-text-muted: ${graphTokens.node.textSecondary};
+    --rf-graph-node-dimmed: ${graphTokens.node.textDimmed};
+    --rf-graph-node-shadow: ${lightTokens.shadow.md};
+    --rf-graph-control-bg: rgba(255,255,255,0.84);
+    --rf-graph-control-border: rgba(28,25,23,0.12);
+    --rf-graph-control-text: ${lightTokens.text.secondary};
+    --rf-graph-control-hover-bg: ${lightTokens.background.surface};
+    --rf-graph-control-hover-text: ${lightTokens.text.primary};
+    --rf-graph-minimap-bg: rgba(255,255,255,0.9);
+    --rf-graph-minimap-border: rgba(28,25,23,0.12);
+    --rf-graph-minimap-node: rgba(120,113,108,0.55);
+    --rf-graph-minimap-mask: rgba(247,245,240,0.7);
   `;
 
   const darkVars = `
@@ -525,8 +527,23 @@ export function buildCssVars(): string {
     --rf-shadow-panel: ${darkTokens.shadow.panel};
     --rf-shadow-top-dock: ${darkTokens.shadow.topDock};
     --rf-graph-canvas: ${graphTokens.canvas.dark};
+    --rf-graph-grid-dot: rgba(255,255,255,0.055);
     --rf-graph-node-bg: ${graphTokens.node.bgDefaultDm};
     --rf-graph-node-root-bg: ${graphTokens.node.bgRootDm};
+    --rf-graph-node-root-border: rgba(255,255,255,0.22);
+    --rf-graph-node-text: rgba(255,255,255,0.88);
+    --rf-graph-node-text-muted: rgba(255,255,255,0.45);
+    --rf-graph-node-dimmed: rgba(255,255,255,0.18);
+    --rf-graph-node-shadow: 0 10px 28px rgba(0,0,0,0.35);
+    --rf-graph-control-bg: ${graphTokens.control.bg};
+    --rf-graph-control-border: ${graphTokens.control.border};
+    --rf-graph-control-text: ${graphTokens.control.text};
+    --rf-graph-control-hover-bg: ${graphTokens.control.bgHover};
+    --rf-graph-control-hover-text: ${graphTokens.control.textHover};
+    --rf-graph-minimap-bg: ${graphTokens.minimap.bg};
+    --rf-graph-minimap-border: ${graphTokens.minimap.border};
+    --rf-graph-minimap-node: ${graphTokens.minimap.nodeColor};
+    --rf-graph-minimap-mask: rgba(4,6,8,0.72);
     --rf-cat-family-subtle: ${categoryTokens.family.dmSubtle};
     --rf-cat-friend-subtle: ${categoryTokens.friend.dmSubtle};
     --rf-cat-romantic-subtle: ${categoryTokens.romantic.dmSubtle};
