@@ -23,6 +23,7 @@ import {
 import { YearMonthPicker } from "../timeline/YearMonthPicker";
 import useAutoRelationships, { createRelationshipKey } from "./useAutoRelationships";
 import ConfirmRelationshipsDialog, { ProposalItem } from "./ConfirmRelationshipsDialog";
+import QuickAddRelationshipsDialog from "./QuickAddRelationshipsDialog";
 
 type ModalState =
   | { type: "none" }
@@ -181,6 +182,7 @@ export function CrudFeature() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPrimary, setConfirmPrimary] = useState<ProposalItem | null>(null);
   const [confirmProposals, setConfirmProposals] = useState<ProposalItem[]>([]);
+  const [quickAddPerson, setQuickAddPerson] = useState<Person | null>(null);
   const [declinedProposalKeys, setDeclinedProposalKeys] = useState<Set<string>>(() => new Set());
 
   const jsonInputRef = useRef<HTMLInputElement | null>(null);
@@ -317,7 +319,11 @@ export function CrudFeature() {
     if (modal.type === "person-edit") {
       updatePerson(modal.person.id, payload);
     } else {
-      addPerson(payload);
+      const created = addPerson(payload);
+      // Close the person modal, then open quick-add relationships for the created person
+      closeModal();
+      setQuickAddPerson(created);
+      return;
     }
     closeModal();
   };
@@ -1233,6 +1239,13 @@ export function CrudFeature() {
           onCancel={handleCancelConfirm}
           onAddAll={handleConfirmAddAll}
           onAddPrimaryOnly={handleAddPrimaryOnly}
+        />
+      )}
+      {quickAddPerson && (
+        <QuickAddRelationshipsDialog
+          open={!!quickAddPerson}
+          person={quickAddPerson}
+          onClose={() => setQuickAddPerson(null)}
         />
       )}
     </>
