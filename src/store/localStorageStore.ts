@@ -9,7 +9,7 @@ export class LocalStorageStore implements RelationshipStore {
   constructor(private userId: string) {}
 
   private get key() {
-    return `relationflow:v1:${this.userId}`;
+    return `whonodeswho:v1:${this.userId}`;
   }
 
   async load(): Promise<PersistedState> {

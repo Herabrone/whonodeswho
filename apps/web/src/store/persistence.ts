@@ -18,6 +18,20 @@ export interface RelationshipStore {
   clear(): Promise<void>;
 }
 
+export type DraftFailureReason = "network" | "unauthorized" | "unknown" | "lifecycle";
+
+export interface PersistedDraft {
+  state: PersistedState;
+  updatedAt: string;
+  reason: DraftFailureReason;
+}
+
+export interface DraftStore {
+  load(): Promise<PersistedDraft | null>;
+  save(draft: PersistedDraft): Promise<void>;
+  clear(): Promise<void>;
+}
+
 export const EMPTY_STATE: PersistedState = {
   graph: { people: [], relationships: [] },
   positions: {},
