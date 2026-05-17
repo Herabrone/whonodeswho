@@ -37,6 +37,7 @@ export interface Relationship {
   isActive?: boolean;
   color?: string;
   notes?: string;
+  autoCreatedReciprocalOfId?: string;
   createdAt: string;
   updatedAt: string;
 }

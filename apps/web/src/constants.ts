@@ -80,6 +80,29 @@ export const RELATIONSHIP_CATALOG: Record<RelationshipCategory, string[]> = {
   other: ["mentor", "mentee", "roommate", "neighbour", "custom"],
 };
 
+export const RECIPROCAL_TYPES: Record<string, string> = {
+  parent: "child",
+  child: "parent",
+  aunt: "niece",
+  uncle: "nephew",
+  niece: "aunt",
+  nephew: "uncle",
+  "aunt/uncle": "niece/nephew",
+  "niece/nephew": "aunt/uncle",
+  grandparent: "grandchild",
+  grandchild: "grandparent",
+  "parent-in-law": "child-in-law",
+  "child-in-law": "parent-in-law",
+  "step-parent": "step-child",
+  "step-child": "step-parent",
+  mentor: "mentee",
+  mentee: "mentor",
+};
+
+export function getReciprocalRelationshipType(type: string): string | undefined {
+  return RECIPROCAL_TYPES[type.trim().toLowerCase()];
+}
+
 /** Relationship types considered "weak" — Track C can hide these. */
 export const WEAK_RELATIONSHIP_TYPES = new Set<string>([
   "acquaintance",

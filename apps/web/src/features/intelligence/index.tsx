@@ -1,12 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildAdjacency, findShortestPath, getNodesWithinDegrees } from "../../lib/graph";
 import { useGraphStore } from "../../store/useGraphStore";
 import { useAutoLayout } from "../../graph/useAutoLayout";
 import { capitalizeWords } from "../../lib/string";
 import type { FocusDegrees } from "../../types";
+import { OPEN_PATH_MODAL_EVENT } from "./pathEvent";
 
 export function IntelligenceFeature() {
   const [pathModalOpen, setPathModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setPathModalOpen(true);
+    window.addEventListener(OPEN_PATH_MODAL_EVENT, handler);
+    return () => window.removeEventListener(OPEN_PATH_MODAL_EVENT, handler);
+  }, []);
+
   const [personAId, setPersonAId] = useState("");
   const [personBId, setPersonBId] = useState("");
   const [pathMessage, setPathMessage] = useState("");

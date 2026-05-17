@@ -273,4 +273,106 @@ describe("useGraphStore http persistence", () => {
     expect(relationship.isActive).toBe(false);
     expect(relationship.endYear).toBe(currentYear);
   });
+
+  it("auto-creates a reciprocal relationship for mapped asymmetric types", () => {
+    const parent = useGraphStore.getState().addRelationship({
+      source: "alice",
+      target: "bob",
+      type: "parent",
+      category: "family",
+      direction: "one-way",
+    });
+
+    expect(useGraphStore.getState().relationships).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: parent.id,
+          source: "alice",
+          target: "bob",
+          type: "parent",
+        }),
+        expect.objectContaining({
+          source: "bob",
+          target: "alice",
+          type: "child",
+          category: "family",
+          direction: "one-way",
+          autoCreatedReciprocalOfId: parent.id,
+        }),
+      ]),
+    );
+  });
+
+  it("supports gendered asymmetric labels without duplicating an existing reciprocal", () => {
+    useGraphStore.setState({
+      relationships: [
+        {
+          id: "existing-nephew",
+          source: "bob",
+          target: "alice",
+          type: "nephew",
+          category: "family",
+          direction: "one-way",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const aunt = useGraphStore.getState().addRelationship({
+      source: "alice",
+      target: "bob",
+      type: "uncle",
+      category: "family",
+      direction: "one-way",
+    });
+
+    const relationships = useGraphStore.getState().relationships;
+    expect(relationships).toHaveLength(2);
+    expect(relationships).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: aunt.id, type: "uncle" }),
+        expect.objectContaining({ id: "existing-nephew", type: "nephew" }),
+      ]),
+    );
+  });
+
+  it("deletes only the auto-created reciprocal when the original is removed", () => {
+    const original = useGraphStore.getState().addRelationship({
+      source: "alice",
+      target: "bob",
+      type: "grandparent",
+      category: "family",
+      direction: "one-way",
+    });
+
+    const reciprocal = useGraphStore
+      .getState()
+      .relationships.find((relationship) => relationship.autoCreatedReciprocalOfId === original.id);
+
+    expect(reciprocal).toBeDefined();
+
+    useGraphStore.getState().deleteRelationship(original.id);
+
+    expect(useGraphStore.getState().relationships).toHaveLength(0);
+  });
+
+  it("leaves symmetric relationship types unchanged", () => {
+    useGraphStore.getState().addRelationship({
+      source: "alice",
+      target: "bob",
+      type: "sibling",
+      category: "family",
+      direction: "two-way",
+    });
+
+    expect(useGraphStore.getState().relationships).toHaveLength(1);
+    expect(useGraphStore.getState().relationships[0]).toEqual(
+      expect.objectContaining({
+        source: "alice",
+        target: "bob",
+        type: "sibling",
+      }),
+    );
+  });
 });
