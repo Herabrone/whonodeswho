@@ -1,7 +1,10 @@
 import type { MouseEvent } from "react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
-import { CATEGORY_COLORS } from "../constants";
+import {
+  getCategoryGfxColor,
+  getCategoryGlowFilter,
+} from "@/design-tokens";
 import type { RelationshipCategory } from "../types";
 
 export interface CategoryNodeData extends Record<string, unknown> {
@@ -11,8 +14,12 @@ export interface CategoryNodeData extends Record<string, unknown> {
 
 export type CategoryFlowNode = Node<CategoryNodeData, "category">;
 
+function getCategorySubtleVar(category: RelationshipCategory): string {
+  return `var(--rf-cat-${category}-subtle)`;
+}
+
 export function CategoryNode({ data }: NodeProps<CategoryFlowNode>) {
-  const color = CATEGORY_COLORS[data.category];
+  const color = getCategoryGfxColor(data.category);
   const hiddenHandleClass = "!opacity-0 !w-0 !h-0 !min-w-0 !min-h-0 !border-0 !bg-transparent";
 
   const onClick = (event: MouseEvent<HTMLDivElement>) => {
@@ -27,7 +34,9 @@ export function CategoryNode({ data }: NodeProps<CategoryFlowNode>) {
       style={{
         borderColor: color,
         color,
-        backgroundColor: `${color}22`,
+        backgroundColor: getCategorySubtleVar(data.category),
+        boxShadow: `0 0 0 1px ${color}22`,
+        filter: getCategoryGlowFilter(data.category, "focused"),
         minWidth: 90,
         pointerEvents: "all",
       }}

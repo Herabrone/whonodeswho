@@ -11,8 +11,29 @@ import { useGraphStore } from "./store/useGraphStore";
 import { CrudFeature } from "./features/crud";
 import { IntelligenceFeature } from "./features/intelligence";
 import { FilteringFeature } from "./features/filtering";
+import { TimelineFeature } from "./features/timeline";
+import { ChatFeature } from "./features/chat";
 import { AuthProvider } from "./auth/AuthContext";
 import { AuthGuard } from "./auth/AuthGuard";
+import { useAuth } from "./auth/AuthContext";
+import {
+  buildCssVars,
+  DESIGN_TOKENS_STYLE_ID,
+  themeStorage,
+} from "@/design-tokens";
+
+if (typeof document !== "undefined") {
+  let style = document.getElementById(DESIGN_TOKENS_STYLE_ID) as HTMLStyleElement | null;
+
+  if (!style) {
+    style = document.createElement("style");
+    style.id = DESIGN_TOKENS_STYLE_ID;
+    document.head.appendChild(style);
+  }
+
+  style.textContent = buildCssVars();
+  themeStorage.apply();
+}
 
 export default function App() {
   return (
@@ -25,16 +46,41 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
+  const { user } = useAuth();
   const hydrated = useGraphStore((s) => s.hydrated);
   const hydrate = useGraphStore((s) => s.hydrate);
+  const flushPersistence = useGraphStore((s) => s.flushPersistence);
+  const saveDraft = useGraphStore((s) => s.saveDraft);
 
   useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+    if (!user) return;
+    void hydrate(user.id);
+  }, [hydrate, user]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      void saveDraft("lifecycle");
+      void flushPersistence();
+    };
+
+    const handlePageHide = () => {
+      void saveDraft("lifecycle");
+      void flushPersistence();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [flushPersistence, saveDraft]);
 
   if (!hydrated) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-canvas text-muted">
+      <div className="flex h-screen w-screen items-center justify-center bg-rf-base text-rf-muted">
         Loading graph…
       </div>
     );
@@ -49,6 +95,8 @@ function AuthenticatedApp() {
             <CrudFeature />
             <IntelligenceFeature />
             <FilteringFeature />
+            <TimelineFeature />
+            <ChatFeature />
           </>
         }
       />

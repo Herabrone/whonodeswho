@@ -18,4 +18,105 @@ model User {
   treeRootId    String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  people        Person[]
+  relationships Relationship[]
+  conversations Conversation[]
+  auditLogs     AuditLog[]
+  usedTokens    UsedToken[]
+}
+
+model Person {
+  dbId          Int            @id @default(autoincrement())
+  id            String
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  aliasesJson   String         @default("[]")
+  notes         String?
+  color         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now())
+  relationshipsFrom Relationship[] @relation("RelationshipSource")
+  relationshipsTo   Relationship[] @relation("RelationshipTarget")
+
+  @@unique([userId, id])
+  @@index([userId])
+  @@index([userId, name])
+}
+
+model Relationship {
+  dbId        Int      @id @default(autoincrement())
+  id          String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceId    String
+  targetId    String
+  source      Person   @relation("RelationshipSource", fields: [userId, sourceId], references: [userId, id], onDelete: Cascade)
+  target      Person   @relation("RelationshipTarget", fields: [userId, targetId], references: [userId, id], onDelete: Cascade)
+  type        String
+  category    String
+  direction   String
+  startYear   Int?
+  startMonth  Int?
+  endYear     Int?
+  isActive    Boolean?
+  color       String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  @@unique([userId, id])
+  @@index([userId])
+  @@index([userId, sourceId])
+  @@index([userId, targetId])
+}
+
+model Conversation {
+  id        String                @id @default(cuid())
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  messages  ConversationMessage[]
+
+  @@index([userId])
+}
+
+model ConversationMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  toolCallId     String?
+  toolName       String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  payload   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model UsedToken {
+  tokenHash  String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actionType String
+  resultJson String
+  expiresAt  DateTime
+  usedAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }

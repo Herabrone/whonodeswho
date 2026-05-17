@@ -19,6 +19,7 @@ import {
   OPEN_RELATIONSHIP_COMPOSER_EVENT,
   type OpenRelationshipComposerDetail,
 } from "./relationshipComposerEvent";
+import { YearMonthPicker } from "../timeline/YearMonthPicker";
 import useAutoRelationships, { createRelationshipKey } from "./useAutoRelationships";
 import ConfirmRelationshipsDialog, { ProposalItem } from "./ConfirmRelationshipsDialog";
 
@@ -43,6 +44,8 @@ interface RelationshipDraft {
   typeChoice: string;
   customType: string;
   direction: RelationshipDirection;
+  startYear?: number;
+  startMonth?: number;
   color: string;
   notes: string;
 }
@@ -89,6 +92,8 @@ function initialRelationshipDraft(relationship?: Relationship): RelationshipDraf
     typeChoice: relationship ? (hasCatalogType ? relationship.type : "__custom__") : availableTypes[0],
     customType: relationship && !hasCatalogType ? relationship.type : "",
     direction: relationship?.direction ?? "two-way",
+    startYear: relationship?.startYear,
+    startMonth: relationship?.startMonth,
     color: relationship?.color ?? "",
     notes: relationship?.notes ?? "",
   };
@@ -168,7 +173,7 @@ export function CrudFeature() {
   const [personError, setPersonError] = useState("");
   const [relationshipDraft, setRelationshipDraft] = useState<RelationshipDraft>(initialRelationshipDraft());
   const [relationshipError, setRelationshipError] = useState("");
-  // Confirmation dialog state for auto-proposed relationships
+  const [endConfirmId, setEndConfirmId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPrimary, setConfirmPrimary] = useState<ProposalItem | null>(null);
   const [confirmProposals, setConfirmProposals] = useState<ProposalItem[]>([]);
@@ -214,6 +219,7 @@ export function CrudFeature() {
   const addRelationship = useGraphStore((s) => s.addRelationship);
   const updateRelationship = useGraphStore((s) => s.updateRelationship);
   const deleteRelationship = useGraphStore((s) => s.deleteRelationship);
+  const endRelationship = useGraphStore((s) => s.endRelationship);
   const replaceGraph = useGraphStore((s) => s.replaceGraph);
 
   const selectRelationship = useGraphStore((s) => s.selectRelationship);
@@ -267,6 +273,7 @@ export function CrudFeature() {
     setImportMessage("");
     setPersonError("");
     setRelationshipError("");
+    setEndConfirmId(null);
   };
 
   const rememberDeclinedProposals = (proposals: ProposalItem[]) => {
@@ -326,6 +333,8 @@ export function CrudFeature() {
       category: relationshipDraft.category,
       type: resolvedType,
       direction: relationshipDraft.direction,
+      startYear: relationshipDraft.startYear,
+      startMonth: relationshipDraft.startMonth,
       color: relationshipDraft.color || undefined,
       notes: relationshipDraft.notes.trim() || undefined,
     };
@@ -418,7 +427,7 @@ export function CrudFeature() {
 
   const exportJson = () => {
     const graph: GraphData = { people, relationships };
-    downloadTextFile("relationflow-graph.json", JSON.stringify(graph, null, 2), "application/json");
+    downloadTextFile("whonodeswho-graph.json", JSON.stringify(graph, null, 2), "application/json");
   };
 
   const exportPeopleCsv = () => {
@@ -433,7 +442,7 @@ export function CrudFeature() {
         p.updatedAt,
       ]),
     );
-    downloadTextFile("relationflow-people.csv", csv, "text/csv");
+    downloadTextFile("whonodeswho-people.csv", csv, "text/csv");
   };
 
   const exportRelationshipsCsv = () => {
@@ -445,6 +454,10 @@ export function CrudFeature() {
         "category",
         "type",
         "direction",
+        "startYear",
+        "startMonth",
+        "endYear",
+        "isActive",
         "color",
         "notes",
         "createdAt",
@@ -457,13 +470,17 @@ export function CrudFeature() {
         r.category,
         r.type,
         r.direction,
+        r.startYear?.toString() ?? "",
+        r.startMonth?.toString() ?? "",
+        r.endYear?.toString() ?? "",
+        r.isActive === undefined ? "" : String(r.isActive),
         r.color ?? "",
         r.notes ?? "",
         r.createdAt,
         r.updatedAt,
       ]),
     );
-    downloadTextFile("relationflow-relationships.csv", csv, "text/csv");
+    downloadTextFile("whonodeswho-relationships.csv", csv, "text/csv");
   };
 
   const importJsonFile = async (file: File) => {
@@ -507,25 +524,25 @@ export function CrudFeature() {
   return (
     <>
       <div className="pointer-events-none absolute right-4 top-4 z-20">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-line bg-panel/95 p-2 shadow-lg backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-rf-border bg-rf-surface p-2 shadow-lg backdrop-blur">
           <button
             type="button"
             onClick={openPersonCreate}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white"
+            className="rounded-lg bg-rf-accent px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
           >
             + Person
           </button>
           <button
             type="button"
             onClick={() => openRelationshipCreate()}
-            className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+            className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
           >
             + Relationship
           </button>
           <button
             type="button"
             onClick={() => setModal({ type: "import-export" })}
-            className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+            className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
           >
             Import / Export
           </button>
@@ -534,60 +551,60 @@ export function CrudFeature() {
 
       {(selectedPerson || selectedRelationship) && (
         <div className="pointer-events-none absolute right-0 top-0 z-30 h-full w-[360px] max-w-[92vw]">
-          <div className="pointer-events-auto h-full border-l border-line bg-panel p-4 shadow-xl">
+          <div className="pointer-events-auto h-full border-l border-rf-border bg-rf-surface p-4 shadow-xl">
             {selectedPerson && (
               <div>
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-display text-lg text-ink">Person details</h3>
+                  <h3 className="font-display text-lg text-rf-text">Person details</h3>
                   <button
                     type="button"
                     onClick={clearSelection}
-                    className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+                    className="rounded border border-rf-border px-2 py-1 text-xs text-rf-muted hover:bg-rf-base"
                   >
                     x
                   </button>
                 </div>
-                <div className="mb-2 text-sm text-muted">Name</div>
-                <div className="mb-3 text-base text-ink">{selectedPerson.name}</div>
-                <div className="mb-2 text-sm text-muted">Notes</div>
-                <div className="mb-4 rounded border border-line bg-canvas p-2 text-sm text-ink">
+                <div className="mb-2 text-sm text-rf-muted">Name</div>
+                <div className="mb-3 text-base text-rf-text">{selectedPerson.name}</div>
+                <div className="mb-2 text-sm text-rf-muted">Notes</div>
+                <div className="mb-4 rounded border border-rf-border bg-rf-subtle p-2 text-sm text-rf-text">
                   {selectedPerson.notes || "No notes"}
                 </div>
                 <div className="mb-4 flex items-center gap-2">
-                  <span className="text-sm text-muted">Color</span>
+                  <span className="text-sm text-rf-muted">Color</span>
                   <span
-                    className="inline-block h-4 w-4 rounded-full border border-line"
+                    className="inline-block h-4 w-4 rounded-full border border-rf-border"
                     style={{ backgroundColor: selectedPerson.color || "#1a1d24" }}
                   />
                 </div>
 
-                <div className="mb-2 text-sm text-muted">
+                <div className="mb-2 text-sm text-rf-muted">
                   Relationships ({relatedToSelectedPerson.length})
                 </div>
-                <ul className="mb-3 max-h-64 space-y-2 overflow-auto rounded border border-line bg-canvas p-2">
+                <ul className="mb-3 max-h-64 space-y-2 overflow-auto rounded border border-rf-border bg-rf-subtle p-2">
                   {relatedToSelectedPerson.map((rel) => {
                     const otherId = rel.source === selectedPerson.id ? rel.target : rel.source;
                     const otherName = peopleById.get(otherId)?.name ?? "Unknown";
                     return (
-                      <li key={rel.id} className="rounded border border-line bg-panel/70 p-2">
+                      <li key={rel.id} className="rounded border border-rf-border bg-rf-surface p-2">
                         <button
                           type="button"
                           onClick={() => selectRelationship(rel.id)}
-                          className="w-full rounded text-left hover:bg-panel"
+                          className="w-full rounded text-left hover:bg-rf-base"
                         >
-                          <div className="text-sm text-ink">{capitalizeWords(rel.type)} · {otherName}</div>
-                          <div className="mt-1 text-xs text-muted">
+                          <div className="text-sm text-rf-text">{capitalizeWords(rel.type)} · {otherName}</div>
+                          <div className="mt-1 text-xs text-rf-muted">
                             {categoryLabels[rel.category]} · {rel.direction}
                           </div>
                           {rel.notes && (
-                            <div className="mt-1 line-clamp-2 text-xs text-muted">{rel.notes}</div>
+                            <div className="mt-1 line-clamp-2 text-xs text-rf-muted">{rel.notes}</div>
                           )}
                         </button>
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
                             onClick={() => openRelationshipEdit(rel)}
-                            className="rounded border border-line bg-canvas px-2 py-1 text-xs text-ink hover:bg-panel"
+                            className="rounded border border-rf-border bg-rf-subtle px-2 py-1 text-xs text-rf-text hover:bg-rf-base"
                           >
                             Edit
                           </button>
@@ -607,7 +624,7 @@ export function CrudFeature() {
                     );
                   })}
                   {relatedToSelectedPerson.length === 0 && (
-                    <li className="px-2 py-1 text-xs text-muted">No relationships</li>
+                    <li className="px-2 py-1 text-xs text-rf-muted">No relationships</li>
                   )}
                 </ul>
 
@@ -615,7 +632,7 @@ export function CrudFeature() {
                   <button
                     type="button"
                     onClick={() => openRelationshipCreate(selectedPerson.id)}
-                    className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+                    className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
                   >
                     Add relationship for {selectedPerson.name}
                   </button>
@@ -625,7 +642,7 @@ export function CrudFeature() {
                   <button
                     type="button"
                     onClick={() => openPersonEdit(selectedPerson)}
-                    className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+                    className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
                   >
                     Edit
                   </button>
@@ -647,38 +664,58 @@ export function CrudFeature() {
             {selectedRelationship && (
               <div>
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-display text-lg text-ink">Relationship details</h3>
+                  <h3 className="font-display text-lg text-rf-text">Relationship details</h3>
                   <button
                     type="button"
                     onClick={clearSelection}
-                    className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+                    className="rounded border border-rf-border px-2 py-1 text-xs text-rf-muted hover:bg-rf-base"
                   >
                     x
                   </button>
                 </div>
-                <dl className="space-y-2 text-sm text-ink">
+                <dl className="space-y-2 text-sm text-rf-text">
                   <div>
-                    <dt className="text-muted">Source</dt>
+                    <dt className="text-rf-muted">Source</dt>
                     <dd>{peopleById.get(selectedRelationship.source)?.name ?? "Unknown"}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Target</dt>
+                    <dt className="text-rf-muted">Target</dt>
                     <dd>{peopleById.get(selectedRelationship.target)?.name ?? "Unknown"}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Category</dt>
+                    <dt className="text-rf-muted">Category</dt>
                     <dd>{categoryLabels[selectedRelationship.category]}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Type</dt>
+                    <dt className="text-rf-muted">Type</dt>
                     <dd>{capitalizeWords(selectedRelationship.type)}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Direction</dt>
+                    <dt className="text-rf-muted">Direction</dt>
                     <dd>{selectedRelationship.direction}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Notes</dt>
+                    <dt className="text-rf-muted">Started</dt>
+                    <dd>
+                      {selectedRelationship.startYear
+                        ? `${selectedRelationship.startYear}${
+                            selectedRelationship.startMonth
+                              ? ` / ${selectedRelationship.startMonth}`
+                              : ""
+                          }`
+                        : "Not recorded"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-rf-muted">Status</dt>
+                    <dd className={selectedRelationship.isActive === false ? "text-rf-muted" : ""}>
+                      {selectedRelationship.isActive === false
+                        ? `Ended ${selectedRelationship.endYear ?? "Unknown year"}`
+                        : "Active"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-rf-muted">Notes</dt>
                     <dd>{selectedRelationship.notes || "No notes"}</dd>
                   </div>
                 </dl>
@@ -687,7 +724,7 @@ export function CrudFeature() {
                   <button
                     type="button"
                     onClick={() => openRelationshipEdit(selectedRelationship)}
-                    className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink hover:bg-panel"
+                    className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
                   >
                     Edit
                   </button>
@@ -702,7 +739,60 @@ export function CrudFeature() {
                   >
                     Delete
                   </button>
+                  {selectedRelationship.isActive === false ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateRelationship(selectedRelationship.id, {
+                          isActive: true,
+                          endYear: undefined,
+                        });
+                        setEndConfirmId(null);
+                      }}
+                      className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
+                    >
+                      Reactivate
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEndConfirmId(selectedRelationship.id)}
+                      className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm text-red-700"
+                    >
+                      End this relationship
+                    </button>
+                  )}
                 </div>
+                {selectedRelationship.isActive !== false && endConfirmId === selectedRelationship.id ? (
+                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    <div>
+                      Mark {capitalizeWords(selectedRelationship.type)} with{" "}
+                      {peopleById.get(selectedRelationship.target)?.name ??
+                        peopleById.get(selectedRelationship.source)?.name ??
+                        "this person"}{" "}
+                      as ended? This sets the end year to {new Date().getFullYear()}.
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          endRelationship(selectedRelationship.id);
+                          setEndConfirmId(null);
+                        }}
+                        className="rounded border border-red-400 bg-red-600 px-2.5 py-1 text-xs font-medium text-white"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEndConfirmId(null)}
+                        className="rounded border border-rf-border bg-rf-surface px-2.5 py-1 text-xs text-rf-text"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -716,43 +806,43 @@ export function CrudFeature() {
               e.preventDefault();
               submitPerson();
             }}
-            className="w-[520px] max-w-full rounded-xl border border-line bg-panel p-4 shadow-xl"
+            className="w-[520px] max-w-full rounded-xl border border-rf-border bg-rf-surface p-4 shadow-xl"
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg text-ink">
+              <h3 className="font-display text-lg text-rf-text">
                 {modal.type === "person-edit" ? "Edit person" : "Add person"}
               </h3>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+                className="rounded border border-rf-border px-2 py-1 text-xs text-rf-muted hover:bg-rf-base"
               >
                 x
               </button>
             </div>
 
             <div className="space-y-3">
-              <label className="block text-sm text-ink">
+              <label className="block text-sm text-rf-text">
                 Name
                 <input
                   value={personDraft.name}
                   onChange={(e) => setPersonDraft((d) => ({ ...d, name: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
                 />
               </label>
 
-              <label className="block text-sm text-ink">
+              <label className="block text-sm text-rf-text">
                 Notes
                 <textarea
                   value={personDraft.notes}
                   onChange={(e) => setPersonDraft((d) => ({ ...d, notes: e.target.value }))}
                   rows={3}
-                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
                 />
               </label>
 
               <div>
-                <div className="mb-1 text-sm text-ink">Color</div>
+                <div className="mb-1 text-sm text-rf-text">Color</div>
                 <div className="flex flex-wrap items-center gap-2">
                   {PERSON_COLORS.map((color) => {
                     const active = (color || "") === personDraft.color;
@@ -761,7 +851,7 @@ export function CrudFeature() {
                         key={color || "none"}
                         type="button"
                         onClick={() => setPersonDraft((d) => ({ ...d, color }))}
-                        className={`h-7 w-7 rounded-full border ${active ? "border-accent ring-2 ring-accent/30" : "border-line"}`}
+                        className={`h-7 w-7 rounded-full border ${active ? "border-rf-accent ring-2 ring-rf-accent" : "border-rf-border"}`}
                         style={{ backgroundColor: color || "transparent" }}
                         title={color || "None"}
                       />
@@ -777,13 +867,13 @@ export function CrudFeature() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink"
+                className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white"
+                className="rounded-lg bg-rf-accent px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
               >
                 Save
               </button>
@@ -794,27 +884,27 @@ export function CrudFeature() {
 
       {(modal.type === "relationship-create" || modal.type === "relationship-edit") && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-4">
-          <div className="w-[580px] max-w-full rounded-xl border border-line bg-panel p-4 shadow-xl">
+          <div className="w-[580px] max-w-full rounded-xl border border-rf-border bg-rf-surface p-4 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg text-ink">
+              <h3 className="font-display text-lg text-rf-text">
                 {modal.type === "relationship-edit" ? "Edit relationship" : "Add relationship"}
               </h3>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+                className="rounded border border-rf-border px-2 py-1 text-xs text-rf-muted hover:bg-rf-base"
               >
                 x
               </button>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="text-sm text-ink">
+              <label className="text-sm text-rf-text">
                 Source
                 <select
                   value={relationshipDraft.source}
                   onChange={(e) => setRelationshipDraft((d) => ({ ...d, source: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
                 >
                   <option value="">Select person</option>
                   {people.map((person) => (
@@ -825,12 +915,12 @@ export function CrudFeature() {
                 </select>
               </label>
 
-              <label className="text-sm text-ink">
+              <label className="text-sm text-rf-text">
                 Target
                 <select
                   value={relationshipDraft.target}
                   onChange={(e) => setRelationshipDraft((d) => ({ ...d, target: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
                 >
                   <option value="">Select person</option>
                   {people.map((person) => (
@@ -841,7 +931,7 @@ export function CrudFeature() {
                 </select>
               </label>
 
-              <label className="text-sm text-ink">
+              <label className="text-sm text-rf-text">
                 Category
                 <select
                   value={relationshipDraft.category}
@@ -855,7 +945,7 @@ export function CrudFeature() {
                       customType: "",
                     }));
                   }}
-                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
                 >
                   {CATEGORIES.map((category) => (
                     <option key={category} value={category}>
@@ -865,14 +955,14 @@ export function CrudFeature() {
                 </select>
               </label>
 
-              <label className="text-sm text-ink">
+              <label className="text-sm text-rf-text">
                 Type
                 <select
                   value={relationshipDraft.typeChoice}
                   onChange={(e) =>
                     setRelationshipDraft((d) => ({ ...d, typeChoice: e.target.value }))
                   }
-                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
                 >
                   {relationshipCatalog[relationshipDraft.category].map((type) => (
                     <option key={type} value={type}>
@@ -884,21 +974,21 @@ export function CrudFeature() {
               </label>
 
               {relationshipDraft.typeChoice === "__custom__" && (
-                <label className="sm:col-span-2 text-sm text-ink">
+                <label className="sm:col-span-2 text-sm text-rf-text">
                   Custom type
                   <input
                     value={relationshipDraft.customType}
                     onChange={(e) =>
                       setRelationshipDraft((d) => ({ ...d, customType: e.target.value }))
                     }
-                    className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
                   />
                 </label>
               )}
 
-              <div className="text-sm text-ink">
+              <div className="text-sm text-rf-text">
                 Direction
-                <div className="mt-1 flex items-center gap-2 rounded-lg border border-line bg-canvas p-1">
+                <div className="mt-1 flex items-center gap-2 rounded-lg border border-rf-border bg-rf-subtle p-1">
                   <button
                     type="button"
                     onClick={() =>
@@ -906,8 +996,8 @@ export function CrudFeature() {
                     }
                     className={`rounded px-3 py-1 text-xs ${
                       relationshipDraft.direction === "two-way"
-                        ? "bg-accent text-white"
-                        : "text-ink"
+                        ? "bg-rf-accent text-white"
+                        : "text-rf-text"
                     }`}
                   >
                     two-way
@@ -919,8 +1009,8 @@ export function CrudFeature() {
                     }
                     className={`rounded px-3 py-1 text-xs ${
                       relationshipDraft.direction === "one-way"
-                        ? "bg-accent text-white"
-                        : "text-ink"
+                        ? "bg-rf-accent text-white"
+                        : "text-rf-text"
                     }`}
                   >
                     one-way
@@ -928,14 +1018,14 @@ export function CrudFeature() {
                 </div>
               </div>
 
-              <div className="text-sm text-ink">
+              <div className="text-sm text-rf-text">
                 Color override
                 <div className="mt-1 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setRelationshipDraft((d) => ({ ...d, color: "" }))}
                     className={`rounded border px-2 py-1 text-xs ${
-                      relationshipDraft.color ? "border-line" : "border-accent text-accent"
+                      relationshipDraft.color ? "border-rf-border" : "border-rf-accent text-rf-accent"
                     }`}
                   >
                     Default
@@ -946,18 +1036,35 @@ export function CrudFeature() {
                     onChange={(e) =>
                       setRelationshipDraft((d) => ({ ...d, color: e.target.value }))
                     }
-                    className="h-9 w-12 rounded border border-line bg-canvas"
+                    className="h-9 w-12 rounded border border-rf-border bg-rf-subtle"
                   />
                 </div>
               </div>
 
-              <label className="sm:col-span-2 text-sm text-ink">
+              <YearMonthPicker
+                startYear={relationshipDraft.startYear}
+                startMonth={relationshipDraft.startMonth}
+                onYearChange={(startYear) =>
+                  setRelationshipDraft((draft) => ({
+                    ...draft,
+                    startYear,
+                  }))
+                }
+                onMonthChange={(startMonth) =>
+                  setRelationshipDraft((draft) => ({
+                    ...draft,
+                    startMonth,
+                  }))
+                }
+              />
+
+              <label className="sm:col-span-2 text-sm text-rf-text">
                 Notes
                 <textarea
                   value={relationshipDraft.notes}
                   onChange={(e) => setRelationshipDraft((d) => ({ ...d, notes: e.target.value }))}
                   rows={3}
-                  className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
                 />
               </label>
             </div>
@@ -968,14 +1075,14 @@ export function CrudFeature() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink"
+                className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={submitRelationship}
-                className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white"
+                className="rounded-lg bg-rf-accent px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
               >
                 Save
               </button>
@@ -986,33 +1093,33 @@ export function CrudFeature() {
 
       {modal.type === "import-export" && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-4">
-          <div className="w-[720px] max-w-full rounded-xl border border-line bg-panel p-4 shadow-xl">
+          <div className="w-[720px] max-w-full rounded-xl border border-rf-border bg-rf-surface p-4 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg text-ink">Import / Export</h3>
+              <h3 className="font-display text-lg text-rf-text">Import / Export</h3>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded border border-line px-2 py-1 text-xs text-muted hover:bg-canvas"
+                className="rounded border border-rf-border px-2 py-1 text-xs text-rf-muted hover:bg-rf-base"
               >
                 x
               </button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <section className="rounded-lg border border-line bg-canvas p-3">
-                <h4 className="mb-2 text-sm font-semibold text-ink">JSON</h4>
+              <section className="rounded-lg border border-rf-border bg-rf-subtle p-3">
+                <h4 className="mb-2 text-sm font-semibold text-rf-text">JSON</h4>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={exportJson}
-                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                    className="rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text"
                   >
                     Export JSON
                   </button>
                   <button
                     type="button"
                     onClick={() => jsonInputRef.current?.click()}
-                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                    className="rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text"
                   >
                     Import JSON
                   </button>
@@ -1029,20 +1136,20 @@ export function CrudFeature() {
                 </div>
               </section>
 
-              <section className="rounded-lg border border-line bg-canvas p-3">
-                <h4 className="mb-2 text-sm font-semibold text-ink">CSV</h4>
+              <section className="rounded-lg border border-rf-border bg-rf-subtle p-3">
+                <h4 className="mb-2 text-sm font-semibold text-rf-text">CSV</h4>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={exportPeopleCsv}
-                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                    className="rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text"
                   >
                     Export people.csv
                   </button>
                   <button
                     type="button"
                     onClick={exportRelationshipsCsv}
-                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                    className="rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text"
                   >
                     Export relationships.csv
                   </button>
@@ -1051,14 +1158,14 @@ export function CrudFeature() {
                   <button
                     type="button"
                     onClick={() => csvPeopleInputRef.current?.click()}
-                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                    className="rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text"
                   >
                     Pick people.csv
                   </button>
                   <button
                     type="button"
                     onClick={() => csvRelationshipsInputRef.current?.click()}
-                    className="rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink"
+                    className="rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text"
                   >
                     Pick relationships.csv
                   </button>
@@ -1070,7 +1177,7 @@ export function CrudFeature() {
                         csvRelationshipsInputRef.current?.files?.[0],
                       )
                     }
-                    className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white"
+                    className="rounded-lg bg-rf-accent px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
                   >
                     Import CSV
                   </button>
@@ -1090,7 +1197,7 @@ export function CrudFeature() {
               </section>
             </div>
 
-            {importMessage && <p className="mt-3 text-sm text-muted">{importMessage}</p>}
+            {importMessage && <p className="mt-3 text-sm text-rf-muted">{importMessage}</p>}
           </div>
         </div>
       )}
@@ -1136,6 +1243,10 @@ function parseRelationshipsCsv(content: string): Relationship[] {
     const get = (name: string) => row[idx[name] ?? -1] ?? "";
     const category = get("category") as RelationshipCategory;
     const direction = get("direction") as RelationshipDirection;
+    const startYear = get("startYear");
+    const startMonth = get("startMonth");
+    const endYear = get("endYear");
+    const isActive = get("isActive");
     return {
       id: get("id"),
       source: get("source"),
@@ -1143,6 +1254,10 @@ function parseRelationshipsCsv(content: string): Relationship[] {
       category: CATEGORIES.includes(category) ? category : "other",
       type: get("type"),
       direction: direction === "one-way" ? "one-way" : "two-way",
+      startYear: startYear ? Number(startYear) : undefined,
+      startMonth: startMonth ? Number(startMonth) : undefined,
+      endYear: endYear ? Number(endYear) : undefined,
+      isActive: isActive === "" ? undefined : isActive === "true",
       color: get("color") || undefined,
       notes: get("notes") || undefined,
       createdAt: get("createdAt") || new Date().toISOString(),

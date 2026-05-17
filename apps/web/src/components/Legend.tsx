@@ -19,12 +19,12 @@ export function Legend() {
   return (
     <div className="pointer-events-none absolute bottom-28 left-0 z-20 flex items-end">
       {isOpen && (
-        <div className="pointer-events-auto w-72 rounded-r-xl border border-l-0 border-line bg-panel/95 p-3 shadow-lg backdrop-blur">
+        <div className="pointer-events-auto w-72 rounded-r-xl border border-l-0 border-rf-border bg-rf-surface p-3 shadow-lg backdrop-blur">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="font-display text-sm font-semibold text-ink">Legend & Groupings</h3>
+            <h3 className="font-display text-sm font-semibold text-rf-text">Legend & Groupings</h3>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-xs text-accent hover:underline"
+              className="text-xs text-rf-accent hover:underline"
             >
               Collapse
             </button>
@@ -38,27 +38,27 @@ export function Legend() {
                     type="color"
                     value={relationshipColors[cat]}
                     onChange={(e) => updateCategoryColor(cat, e.target.value)}
-                    className="h-6 w-8 rounded border border-line bg-canvas p-0"
+                    className="h-6 w-8 rounded border border-rf-border bg-rf-subtle p-0"
                     aria-label={`Color for ${categoryLabels[cat]}`}
                   />
                   <input
-                    className="w-full rounded border-none bg-transparent px-1 text-xs font-medium focus:ring-1 focus:ring-accent"
+                    className="w-full rounded border-none bg-transparent px-1 text-xs font-medium text-rf-text focus:ring-1 focus:ring-rf-accent"
                     value={categoryLabels[cat]}
                     onChange={(e) => updateCategoryLabel(cat, e.target.value)}
                   />
                   <button
                     onClick={() => setEditingCategory(editingCategory === cat ? null : cat)}
-                    className="text-[10px] text-muted hover:text-accent"
+                    className="text-[10px] text-rf-muted hover:text-rf-accent"
                   >
                     {editingCategory === cat ? "done" : "edit types"}
                   </button>
                 </div>
 
                 {editingCategory === cat && (
-                  <div className="ml-5 space-y-2 border-l border-line py-1 pl-3">
+                  <div className="ml-5 space-y-2 border-l border-rf-border py-1 pl-3">
                     <ul className="space-y-1">
                       {relationshipCatalog[cat].map((type) => (
-                        <li key={type} className="group flex items-center justify-between text-[11px] text-muted">
+                        <li key={type} className="group flex items-center justify-between text-[11px] text-rf-muted">
                           <span>{type}</span>
                           <button
                             onClick={() => removeRelationshipType(cat, type)}
@@ -72,7 +72,7 @@ export function Legend() {
                     <div className="flex gap-1">
                       <input
                         placeholder="Add type..."
-                        className="w-full rounded border border-line bg-canvas px-1 py-0.5 text-[10px]"
+                        className="w-full rounded border border-rf-border bg-rf-subtle px-1 py-0.5 text-[10px] text-rf-text placeholder:text-rf-muted"
                         value={newType}
                         onChange={(e) => setNewType(e.target.value)}
                         onKeyDown={(e) => {
@@ -89,7 +89,7 @@ export function Legend() {
                             setNewType("");
                           }
                         }}
-                        className="rounded bg-accent px-1.5 text-[10px] text-white"
+                        className="rounded bg-rf-accent px-1.5 text-[10px] text-white transition-opacity hover:opacity-90"
                       >
                         +
                       </button>
@@ -104,7 +104,7 @@ export function Legend() {
 
       <button
         onClick={() => setIsOpen((v) => !v)}
-        className="pointer-events-auto rounded-r-lg border border-l-0 border-line bg-panel px-2 py-3 text-xs font-medium text-ink shadow"
+        className="pointer-events-auto rounded-r-lg border border-l-0 border-rf-border bg-rf-surface px-2 py-3 text-xs font-medium text-rf-text shadow"
       >
         {isOpen ? "<" : ">"} Legend
       </button>

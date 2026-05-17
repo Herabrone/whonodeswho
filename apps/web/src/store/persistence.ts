@@ -1,5 +1,5 @@
 /**
- * RelationFlow — PERSISTENCE CONTRACT
+ * whoNodeswho — PERSISTENCE CONTRACT
  * -----------------------------------
  * The store talks to persistence ONLY through this async interface. Today the
  * implementation is localStorage; swapping to Supabase/Postgres later means
@@ -15,6 +15,20 @@ export interface RelationshipStore {
   /** Persist the full state. Implementations may debounce internally. */
   save(state: PersistedState): Promise<void>;
   /** Remove all persisted data. */
+  clear(): Promise<void>;
+}
+
+export type DraftFailureReason = "network" | "unauthorized" | "unknown" | "lifecycle";
+
+export interface PersistedDraft {
+  state: PersistedState;
+  updatedAt: string;
+  reason: DraftFailureReason;
+}
+
+export interface DraftStore {
+  load(): Promise<PersistedDraft | null>;
+  save(draft: PersistedDraft): Promise<void>;
   clear(): Promise<void>;
 }
 

@@ -3,13 +3,18 @@
  * Versioned key so future migrations are possible.
  */
 import type { PersistedState } from "../types";
-import { EMPTY_STATE, type RelationshipStore } from "./persistence";
+import {
+  EMPTY_STATE,
+  type DraftStore,
+  type PersistedDraft,
+  type RelationshipStore,
+} from "./persistence";
 
 export class LocalStorageStore implements RelationshipStore {
   constructor(private userId: string) {}
 
   private get key() {
-    return `relationflow:v1:${this.userId}`;
+    return `whonodeswho:v1:${this.userId}`;
   }
 
   async load(): Promise<PersistedState> {
@@ -53,7 +58,55 @@ export class LocalStorageStore implements RelationshipStore {
   }
 }
 
+export class LocalDraftStore implements DraftStore {
+  constructor(private userId: string) {}
+
+  private get key() {
+    return `whonodeswho:draft:v1:${this.userId}`;
+  }
+
+  async load(): Promise<PersistedDraft | null> {
+    try {
+      const raw = localStorage.getItem(this.key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as PersistedDraft;
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        typeof parsed.updatedAt !== "string" ||
+        typeof parsed.reason !== "string" ||
+        !parsed.state?.graph ||
+        !Array.isArray(parsed.state.graph.people) ||
+        !Array.isArray(parsed.state.graph.relationships)
+      ) {
+        return null;
+      }
+
+      return parsed;
+    } catch (err) {
+      console.error("[LocalDraftStore] load failed:", err);
+      return null;
+    }
+  }
+
+  async save(draft: PersistedDraft): Promise<void> {
+    try {
+      localStorage.setItem(this.key, JSON.stringify(draft));
+    } catch (err) {
+      console.error("[LocalDraftStore] save failed:", err);
+    }
+  }
+
+  async clear(): Promise<void> {
+    localStorage.removeItem(this.key);
+  }
+}
+
 /** Factory to create a persistence store for a specific user. */
 export function createPersistenceStore(userId: string): RelationshipStore {
   return new LocalStorageStore(userId);
+}
+
+export function createDraftStore(userId: string): DraftStore {
+  return new LocalDraftStore(userId);
 }

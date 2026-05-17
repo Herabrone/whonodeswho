@@ -1,49 +1,67 @@
 /**
- * AppShell — application chrome.
- * Renders the header and hosts the graph canvas plus the three feature
- * overlays. Layout is intentionally flat: features position themselves as
- * absolute overlays within reserved regions (see each feature stub).
+ * AppShell - application chrome.
+ * Renders the header and hosts the graph canvas plus the feature overlays.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { themeStorage, type ThemeName } from "../design-tokens";
 import { Legend } from "./Legend";
+import { TimelineToggleButton } from "./TimelineToggleButton";
 import { useGraphStore } from "../store/useGraphStore";
 import { useAuth } from "../auth/AuthContext";
 
 interface AppShellProps {
-  /** The graph canvas. */
   canvas: ReactNode;
-  /** Feature overlays (Track A / B / C). */
   overlays: ReactNode;
 }
 
 export function AppShell({ canvas, overlays }: AppShellProps) {
+  const [theme, setTheme] = useState<ThemeName>(() => {
+    if (typeof document !== "undefined") {
+      const appliedTheme = document.documentElement.getAttribute("data-theme");
+      if (appliedTheme === "light" || appliedTheme === "dark") {
+        return appliedTheme;
+      }
+    }
+
+    return themeStorage.get();
+  });
   const layoutMode = useGraphStore((s) => s.layoutMode);
   const treeShape = useGraphStore((s) => s.treeShape);
   const treeRootId = useGraphStore((s) => s.treeRootId);
   const selectedPersonId = useGraphStore((s) => s.selectedPersonId);
+  const persistenceError = useGraphStore((s) => s.persistenceError);
+  const recoveryDraft = useGraphStore((s) => s.recoveryDraft);
   const setLayoutMode = useGraphStore((s) => s.setLayoutMode);
   const setTreeShape = useGraphStore((s) => s.setTreeShape);
   const setTreeRoot = useGraphStore((s) => s.setTreeRoot);
+  const restoreRecoveryDraft = useGraphStore((s) => s.restoreRecoveryDraft);
+  const discardRecoveryDraft = useGraphStore((s) => s.discardRecoveryDraft);
+  const clearPersistenceError = useGraphStore((s) => s.clearPersistenceError);
 
   const { signOut } = useAuth();
 
+  const applyTheme = (nextTheme: ThemeName) => {
+    setTheme(nextTheme);
+    themeStorage.set(nextTheme);
+  };
+
   return (
-    <div className="flex h-screen w-screen flex-col bg-canvas">
-      <header className="flex items-center justify-between border-b border-line bg-panel px-5 py-3">
+    <div className="flex h-screen w-screen flex-col bg-rf-base">
+      <header className="flex items-center justify-between border-b border-rf-border bg-rf-surface px-5 py-3">
         <div className="flex items-baseline gap-2">
-          <h1 className="text-xl font-semibold text-ink">
+          <h1 className="text-xl font-semibold text-rf-text">
             <span className="font-sans tracking-tight">who</span>
-            <span className="font-display text-2xl italic text-accent">nodes</span>
+            <span className="font-display text-2xl italic text-rf-accent">nodes</span>
             <span className="font-sans tracking-tight">who</span>
           </h1>
-          <span className="text-xs text-muted">personal relationship map</span>
+          <span className="text-xs text-rf-muted">personal relationship map</span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="inline-flex rounded-full border border-line bg-canvas p-0.5 text-xs">
+          <div className="inline-flex rounded-full border border-rf-border bg-rf-base p-0.5 text-xs">
             <button
               type="button"
               className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                layoutMode === "free" ? "bg-panel text-ink" : "text-muted"
+                layoutMode === "free" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
               }`}
               onClick={() => setLayoutMode("free")}
             >
@@ -52,7 +70,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
             <button
               type="button"
               className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                layoutMode === "tree" ? "bg-panel text-ink" : "text-muted"
+                layoutMode === "tree" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
               }`}
               onClick={() => {
                 setLayoutMode("tree");
@@ -63,11 +81,11 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
             </button>
           </div>
           {layoutMode === "tree" ? (
-            <div className="inline-flex rounded-full border border-line bg-canvas p-0.5 text-xs">
+            <div className="inline-flex rounded-full border border-rf-border bg-rf-base p-0.5 text-xs">
               <button
                 type="button"
                 className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                  treeShape === "grouped" ? "bg-panel text-ink" : "text-muted"
+                  treeShape === "grouped" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
                 }`}
                 onClick={() => {
                   setTreeShape("grouped");
@@ -79,7 +97,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
               <button
                 type="button"
                 className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                  treeShape === "radial" ? "bg-panel text-ink" : "text-muted"
+                  treeShape === "radial" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
                 }`}
                 onClick={() => setTreeShape("radial")}
               >
@@ -88,7 +106,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
               <button
                 type="button"
                 className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                  treeShape === "layered" ? "bg-panel text-ink" : "text-muted"
+                  treeShape === "layered" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
                 }`}
                 onClick={() => setTreeShape("layered")}
               >
@@ -96,10 +114,32 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
               </button>
             </div>
           ) : null}
-          {/* Phase badge removed per UX update */}
+          <TimelineToggleButton />
+          <div className="inline-flex rounded-full border border-rf-border bg-rf-base p-0.5 text-xs">
+            <button
+              type="button"
+              className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                theme === "light" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
+              }`}
+              onClick={() => applyTheme("light")}
+              aria-pressed={theme === "light"}
+            >
+              Light
+            </button>
+            <button
+              type="button"
+              className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                theme === "dark" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
+              }`}
+              onClick={() => applyTheme("dark")}
+              aria-pressed={theme === "dark"}
+            >
+              Dark
+            </button>
+          </div>
           <button
             onClick={signOut}
-            className="text-xs font-medium text-muted hover:text-ink transition-colors"
+            className="text-xs font-medium text-rf-muted transition-colors hover:text-rf-text"
           >
             Sign out
           </button>
@@ -107,8 +147,41 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
       </header>
       <main className="relative flex-1 overflow-hidden">
         {canvas}
+        {recoveryDraft ? (
+          <div className="absolute left-1/2 top-5 z-40 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-rf-border bg-rf-surface px-4 py-3 text-xs text-rf-text shadow-panel">
+            <div className="max-w-md">
+              Unsaved graph changes from {new Date(recoveryDraft.updatedAt).toLocaleString()} were recovered locally.
+            </div>
+            <button
+              type="button"
+              className="rounded-full bg-rf-text px-3 py-1 font-medium text-rf-surface"
+              onClick={() => void restoreRecoveryDraft()}
+            >
+              Restore draft
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-rf-border px-3 py-1 font-medium text-rf-muted"
+              onClick={() => void discardRecoveryDraft()}
+            >
+              Discard
+            </button>
+          </div>
+        ) : null}
+        {persistenceError && !recoveryDraft ? (
+          <div className="absolute left-1/2 top-5 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-rf-border bg-rf-surface px-4 py-2 text-xs font-medium text-rf-text shadow-panel">
+            <span>{persistenceError}</span>
+            <button
+              type="button"
+              className="text-rf-muted transition-colors hover:text-rf-text"
+              onClick={clearPersistenceError}
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
         {layoutMode === "tree" && treeRootId === null ? (
-          <div className="pointer-events-none absolute left-1/2 top-5 z-40 -translate-x-1/2 rounded-full border border-line bg-panel/95 px-4 py-1.5 text-xs font-medium text-muted shadow-panel">
+          <div className="pointer-events-none absolute left-1/2 top-5 z-40 -translate-x-1/2 rounded-full border border-rf-border bg-rf-surface px-4 py-1.5 text-xs font-medium text-rf-muted shadow-panel">
             Click a person to grow the tree.
           </div>
         ) : null}

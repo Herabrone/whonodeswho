@@ -33,18 +33,18 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center bg-canvas p-4">
+    <div className="flex h-screen w-screen flex-col items-center justify-center bg-rf-base p-4">
       <div className="mb-8 flex flex-col items-center gap-2">
-        <h1 className="text-4xl font-semibold text-ink">
+        <h1 className="text-4xl font-semibold text-rf-text">
           <span className="font-sans tracking-tight">who</span>
-          <span className="font-display text-5xl italic text-accent">nodes</span>
+          <span className="font-display text-5xl italic text-rf-accent">nodes</span>
           <span className="font-sans tracking-tight">who</span>
         </h1>
-        <p className="text-sm text-muted">personal relationship map</p>
+        <p className="text-sm text-rf-muted">personal relationship map</p>
       </div>
 
-      <div className="w-full max-w-md rounded-xl border border-line bg-panel p-8 shadow-xl">
-        <h2 className="mb-6 text-2xl font-semibold text-ink">
+      <div className="w-full max-w-md rounded-xl border border-rf-border bg-rf-surface p-8 shadow-xl">
+        <h2 className="mb-6 text-2xl font-semibold text-rf-text">
           {mode === "signin" ? "Sign in" : "Create account"}
         </h2>
 
@@ -52,7 +52,7 @@ export function LoginPage() {
           <div>
             <label 
               htmlFor="email"
-              className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1"
+              className="mb-1 block text-xs font-semibold uppercase tracking-wider text-rf-muted"
             >
               Email
             </label>
@@ -63,7 +63,7 @@ export function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting}
-              className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+              className="w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text placeholder:text-rf-muted focus:border-rf-accent focus:outline-none"
               placeholder="you@example.com"
             />
           </div>
@@ -71,7 +71,7 @@ export function LoginPage() {
           <div>
             <label 
               htmlFor="password"
-              className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1"
+              className="mb-1 block text-xs font-semibold uppercase tracking-wider text-rf-muted"
             >
               Password
             </label>
@@ -83,7 +83,7 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={submitting}
-              className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+              className="w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text placeholder:text-rf-muted focus:border-rf-accent focus:outline-none"
               placeholder="••••••••"
             />
           </div>
@@ -92,7 +92,7 @@ export function LoginPage() {
             <div>
               <label 
                 htmlFor="confirmPassword"
-                className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1"
+                className="mb-1 block text-xs font-semibold uppercase tracking-wider text-rf-muted"
               >
                 Confirm Password
               </label>
@@ -103,7 +103,7 @@ export function LoginPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={submitting}
-                className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+                className="w-full rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text placeholder:text-rf-muted focus:border-rf-accent focus:outline-none"
                 placeholder="••••••••"
               />
             </div>
@@ -118,7 +118,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="flex w-full items-center justify-center rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-accent/90 disabled:opacity-50"
+            className="flex w-full items-center justify-center rounded-lg bg-rf-accent px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -137,7 +137,7 @@ export function LoginPage() {
               setMode(mode === "signin" ? "signup" : "signin");
               setLocalError(null);
             }}
-            className="text-center text-sm text-muted hover:text-ink"
+            className="text-center text-sm text-rf-muted hover:text-rf-text"
           >
             {mode === "signin"
               ? "Don't have an account? Sign up"

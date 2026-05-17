@@ -1,5 +1,5 @@
 /**
- * RelationFlow — GRAPH ALGORITHM PRIMITIVES
+ * whoNodeswho — GRAPH ALGORITHM PRIMITIVES
  * Pure, framework-free functions. Foundation owns these; Track B orchestrates
  * them into Focus Mode and Degrees-of-Separation features.
  *

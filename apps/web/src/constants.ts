@@ -1,16 +1,32 @@
 /**
- * RelationFlow — SHARED CONSTANTS
+ * whoNodeswho — SHARED CONSTANTS
  * Single source of truth for category colors and the relationship catalog.
- * Mirror of the color values in tailwind.config.js — keep them in sync.
  */
+import {
+  getCategoryGfxColor,
+  getCategoryUiColor,
+  primitives,
+} from "./design-tokens";
 import type { RelationshipCategory } from "./types";
 
+export const CATEGORY_GFX_COLORS: Record<RelationshipCategory, string> = {
+  family: getCategoryGfxColor("family"),
+  friend: getCategoryGfxColor("friend"),
+  romantic: getCategoryGfxColor("romantic"),
+  work: getCategoryGfxColor("work"),
+  other: getCategoryGfxColor("other"),
+};
+
+export const CATEGORY_UI_COLORS: Record<RelationshipCategory, string> = {
+  family: getCategoryUiColor("family"),
+  friend: getCategoryUiColor("friend"),
+  romantic: getCategoryUiColor("romantic"),
+  work: getCategoryUiColor("work"),
+  other: getCategoryUiColor("other"),
+};
+
 export const CATEGORY_COLORS: Record<RelationshipCategory, string> = {
-  family: "#3b5bdb",
-  friend: "#2f9e44",
-  romantic: "#e64980",
-  work: "#f08c00",
-  other: "#868e96",
+  ...CATEGORY_GFX_COLORS,
 };
 
 export const CATEGORIES: RelationshipCategory[] = [
@@ -66,7 +82,7 @@ export const WEAK_RELATIONSHIP_TYPES = new Set<string>([
 ]);
 
 /** Default fallback color for a Person node when Person.color is absent. */
-export const DEFAULT_PERSON_COLOR = "#1a1d24";
+export const DEFAULT_PERSON_COLOR = primitives.neutral[900];
 
 /** Resolve the display color of a relationship. */
 export function relationshipColor(category: RelationshipCategory, override?: string): string {

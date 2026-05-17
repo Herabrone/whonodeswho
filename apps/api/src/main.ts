@@ -20,8 +20,8 @@ async function bootstrap() {
   app.use(cookieParser());
   app.use(
     session({
-      name: 'relationflow.sid',
-      secret: process.env.SESSION_SECRET ?? 'relationflow-local-dev',
+      name: 'whonodeswho.sid',
+      secret: process.env.SESSION_SECRET ?? 'whonodeswho-local-dev',
       resave: false,
       saveUninitialized: false,
       cookie: {

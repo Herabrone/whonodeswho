@@ -7,13 +7,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-canvas text-muted">
+      <div className="flex h-screen w-screen items-center justify-center bg-rf-base text-rf-muted">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-rf-accent border-t-transparent" />
           <div className="flex items-baseline gap-2">
-            <h1 className="text-xl font-semibold text-ink">
+            <h1 className="text-xl font-semibold text-rf-text">
               <span className="font-sans tracking-tight">who</span>
-              <span className="font-display text-2xl italic text-accent">nodes</span>
+              <span className="font-display text-2xl italic text-rf-accent">nodes</span>
               <span className="font-sans tracking-tight">who</span>
             </h1>
           </div>

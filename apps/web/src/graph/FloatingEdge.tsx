@@ -18,6 +18,7 @@ interface RelationshipEdgeData {
   secondary?: boolean;
   labelRank?: number;
   labelCount?: number;
+  labelShiftPx?: number;
 }
 
 interface NodeGeometry {

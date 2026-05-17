@@ -1,5 +1,5 @@
 /**
- * RelationFlow — GLOBAL STORE  (THE INTEGRATION CONTRACT)
+ * whoNodeswho — GLOBAL STORE  (THE INTEGRATION CONTRACT)
  * =======================================================
  * Every parallel track integrates through this store and ONLY through this
  * store. All state slices and actions are declared here in Phase 0 so that:
@@ -11,7 +11,7 @@
  *
  * State persists automatically (debounced) via the persistence contract.
  */
-import { create } from "zustand";
+import { create, type StateCreator } from "zustand";
 import type {
   FocusDegrees,
   GraphData,
@@ -32,7 +32,16 @@ import {
 } from "../constants";
 import { newId, nowIso } from "../lib/id";
 import { createPersistenceStore } from "./httpStore";
-import { EMPTY_STATE, type RelationshipStore } from "./persistence";
+import { ApiRequestError } from "../lib/apiClient";
+import { createDraftStore } from "./localStorageStore";
+import {
+  EMPTY_STATE,
+  type DraftFailureReason,
+  type DraftStore,
+  type PersistedDraft,
+  type RelationshipStore,
+} from "./persistence";
+import type { PersistedState } from "../types";
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -75,9 +84,19 @@ interface LayoutSlice {
   treeRootId: string | null;
 }
 
+interface TimelineSlice {
+  timelineOpen: boolean;
+  timelineYear: number;
+  timelinePlaying: boolean;
+  timelineSpeed: 1 | 2 | 3;
+}
+
 interface Lifecycle {
   hydrated: boolean;
   _persistence: RelationshipStore | null;
+  _drafts: DraftStore | null;
+  persistenceError: string | null;
+  recoveryDraft: PersistedDraft | null;
 }
 
 export interface GraphStore
@@ -86,9 +105,15 @@ export interface GraphStore
     ViewSlice,
     FocusSlice,
     LayoutSlice,
+    TimelineSlice,
     Lifecycle {
   // -- lifecycle --
-  hydrate: () => Promise<void>;
+  hydrate: (userId: string) => Promise<void>;
+  flushPersistence: () => Promise<void>;
+  saveDraft: (reason?: DraftFailureReason) => Promise<void>;
+  restoreRecoveryDraft: () => Promise<void>;
+  discardRecoveryDraft: () => Promise<void>;
+  clearPersistenceError: () => void;
   signOut: () => void;
 
   // -- data actions (Track A) --
@@ -126,6 +151,14 @@ export interface GraphStore
   setTreeShape: (shape: TreeShape) => void;
   setTreeRoot: (personId: string | null) => void;
 
+  // -- timeline actions (Timeline feature) --
+  openTimeline: () => void;
+  closeTimeline: () => void;
+  setTimelineYear: (value: number | ((prev: number) => number)) => void;
+  setTimelinePlaying: (value: boolean) => void;
+  setTimelineSpeed: (speed: 1 | 2 | 3) => void;
+  endRelationship: (id: string) => void;
+
   // -- legend actions (Contract Amendment) --
   updateCategoryLabel: (category: RelationshipCategory, label: string) => void;
   updateCategoryColor: (category: RelationshipCategory, color: string) => void;
@@ -133,26 +166,133 @@ export interface GraphStore
   removeRelationshipType: (category: RelationshipCategory, type: string) => void;
 }
 
+type GraphStoreSet = Parameters<StateCreator<GraphStore>>[0];
+
 // ---------------------------------------------------------------------------
 // Debounced persistence
 // ---------------------------------------------------------------------------
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleSave(get: () => GraphStore) {
-  if (saveTimer) clearTimeout(saveTimer);
+
+function clearScheduledSave() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+}
+
+function buildPersistedState(state: GraphStore): PersistedState {
+  return {
+    graph: {
+      people: state.people,
+      relationships: state.relationships,
+    },
+    positions: state.positions,
+    layout: {
+      layoutMode: state.layoutMode,
+      treeShape: state.treeShape,
+      treeRootId: state.treeRootId,
+    },
+  };
+}
+
+function getPersistenceErrorMessage(reason: DraftFailureReason) {
+  if (reason === "unauthorized") {
+    return "Session expired. Your latest graph edits were saved locally for recovery.";
+  }
+
+  if (reason === "lifecycle") {
+    return "A local draft was captured while the page was closing. You can restore it after signing back in.";
+  }
+
+  return "Graph changes could not reach the server. Your latest edits were saved locally for recovery.";
+}
+
+function getDraftFailureReason(error: unknown): DraftFailureReason {
+  if (error instanceof ApiRequestError && error.status === 401) {
+    return "unauthorized";
+  }
+
+  if (error instanceof TypeError) {
+    return "network";
+  }
+
+  return "unknown";
+}
+
+function setPersistedSlices(
+  set: GraphStoreSet,
+  persisted: PersistedState,
+) {
+  set({
+    people: persisted.graph.people,
+    relationships: persisted.graph.relationships,
+    positions: persisted.positions,
+    layoutMode: persisted.layout.layoutMode,
+    treeShape: persisted.layout.treeShape,
+    treeRootId: persisted.layout.treeRootId,
+    selectedPersonId: null,
+    selectedRelationshipId: null,
+    focusPersonId: null,
+    pathPersonIds: [],
+  });
+}
+
+async function saveDraft(
+  get: () => GraphStore,
+  set: GraphStoreSet,
+  reason: DraftFailureReason,
+  exposeRecovery = false,
+) {
+  const drafts = get()._drafts;
+  if (!drafts) return;
+
+  const draft: PersistedDraft = {
+    state: buildPersistedState(get()),
+    updatedAt: new Date().toISOString(),
+    reason,
+  };
+
+  await drafts.save(draft);
+  set({
+    persistenceError: getPersistenceErrorMessage(reason),
+    recoveryDraft: exposeRecovery ? draft : get().recoveryDraft,
+  });
+}
+
+async function flushPersistence(
+  get: () => GraphStore,
+  set: GraphStoreSet,
+) {
+  clearScheduledSave();
   const persistence = get()._persistence;
   if (!persistence) return;
 
+  try {
+    await persistence.save(buildPersistedState(get()));
+    if (get()._drafts) {
+      await get()._drafts!.clear();
+    }
+    set({ persistenceError: null, recoveryDraft: null });
+  } catch (error) {
+    const reason = getDraftFailureReason(error);
+    await saveDraft(get, set, reason);
+    throw error;
+  }
+}
+
+function scheduleSave(
+  get: () => GraphStore,
+  set: GraphStoreSet,
+) {
+  const persistence = get()._persistence;
+  clearScheduledSave();
+  if (!persistence) return;
+
   saveTimer = setTimeout(() => {
-    const s = get();
-    void persistence.save({
-      graph: { people: s.people, relationships: s.relationships },
-      positions: s.positions,
-      layout: {
-        layoutMode: s.layoutMode,
-        treeShape: s.treeShape,
-        treeRootId: s.treeRootId,
-      },
+    saveTimer = null;
+    void flushPersistence(get, set).catch((error) => {
+      console.error("[useGraphStore] save failed:", error);
     });
   }, 400);
 }
@@ -180,6 +320,15 @@ const LAYOUT_DEFAULTS: LayoutSlice = {
   treeRootId: null,
 };
 
+const getCurrentYear = () => new Date().getFullYear();
+
+const TIMELINE_DEFAULTS: TimelineSlice = {
+  timelineOpen: false,
+  timelineYear: getCurrentYear(),
+  timelinePlaying: false,
+  timelineSpeed: 1,
+};
+
 export const useGraphStore = create<GraphStore>((set, get) => ({
   // initial state
   people: [],
@@ -190,16 +339,25 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   ...VIEW_DEFAULTS,
   ...LEGEND_DEFAULTS,
   ...LAYOUT_DEFAULTS,
+  ...TIMELINE_DEFAULTS,
   focusPersonId: null,
   focusDegrees: 1,
   pathPersonIds: [],
   hydrated: false,
   _persistence: null,
+  _drafts: null,
+  persistenceError: null,
+  recoveryDraft: null,
 
   // -- lifecycle --
-  hydrate: async () => {
+  hydrate: async (userId) => {
     const store = createPersistenceStore();
-    const persisted = await store.load().catch(() => EMPTY_STATE);
+    const drafts = createDraftStore(userId);
+    const [persisted, draft] = await Promise.all([
+      store.load().catch(() => EMPTY_STATE),
+      drafts.load().catch(() => null),
+    ]);
+
     set({
       people: persisted.graph.people,
       relationships: persisted.graph.relationships,
@@ -209,10 +367,45 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       treeRootId: persisted.layout?.treeRootId ?? LAYOUT_DEFAULTS.treeRootId,
       hydrated: true,
       _persistence: store,
+      _drafts: drafts,
+      persistenceError:
+        draft?.reason === "lifecycle"
+          ? getPersistenceErrorMessage(draft.reason)
+          : null,
+      recoveryDraft: draft,
     });
   },
 
+  flushPersistence: async () => {
+    await flushPersistence(get, set);
+  },
+
+  saveDraft: async (reason = "unknown") => {
+    await saveDraft(get, set, reason);
+  },
+
+  restoreRecoveryDraft: async () => {
+    const draft = get().recoveryDraft;
+    if (!draft) return;
+
+    setPersistedSlices(set, draft.state);
+    await flushPersistence(get, set);
+  },
+
+  discardRecoveryDraft: async () => {
+    const drafts = get()._drafts;
+    if (drafts) {
+      await drafts.clear();
+    }
+    set({ recoveryDraft: null, persistenceError: null });
+  },
+
+  clearPersistenceError: () => {
+    set({ persistenceError: null });
+  },
+
   signOut: () => {
+    clearScheduledSave();
     set({
       people: [],
       relationships: [],
@@ -221,8 +414,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedRelationshipId: null,
       focusPersonId: null,
       pathPersonIds: [],
+      ...TIMELINE_DEFAULTS,
       hydrated: false,
       _persistence: null,
+      _drafts: null,
+      persistenceError: null,
+      recoveryDraft: null,
     });
   },
 
@@ -235,7 +432,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       updatedAt: nowIso(),
     };
     set((s) => ({ people: [...s.people, person] }));
-    scheduleSave(get);
+    scheduleSave(get, set);
     return person;
   },
 
@@ -245,7 +442,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         p.id === id ? { ...p, ...patch, updatedAt: nowIso() } : p,
       ),
     }));
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
 
   deletePerson: (id) => {
@@ -266,7 +463,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         treeRootId: s.treeRootId === id ? null : s.treeRootId,
       };
     });
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
 
   addRelationship: (input) => {
@@ -277,7 +474,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       updatedAt: nowIso(),
     };
     set((s) => ({ relationships: [...s.relationships, relationship] }));
-    scheduleSave(get);
+    scheduleSave(get, set);
     return relationship;
   },
 
@@ -287,7 +484,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         r.id === id ? { ...r, ...patch, updatedAt: nowIso() } : r,
       ),
     }));
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
 
   deleteRelationship: (id) => {
@@ -296,7 +493,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedRelationshipId:
         s.selectedRelationshipId === id ? null : s.selectedRelationshipId,
     }));
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
 
   replaceGraph: (graph) => {
@@ -310,12 +507,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       pathPersonIds: [],
       treeRootId: null,
     });
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
 
   setPosition: (personId, pos) => {
     set((s) => ({ positions: { ...s.positions, [personId]: pos } }));
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
 
   // -- selection actions --
@@ -355,15 +552,42 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   // -- layout actions --
   setLayoutMode: (mode) => {
     set({ layoutMode: mode });
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
   setTreeShape: (shape) => {
     set({ treeShape: shape });
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
   setTreeRoot: (personId) => {
     set({ treeRootId: personId });
-    scheduleSave(get);
+    scheduleSave(get, set);
+  },
+
+  // -- timeline actions --
+  openTimeline: () => {
+    const years = get()
+      .relationships.map((relationship) => relationship.startYear)
+      .filter((year): year is number => typeof year === "number");
+    const earliestYear =
+      years.length > 0 ? Math.min(...years) : getCurrentYear() - 5;
+    set({
+      timelineOpen: true,
+      timelineYear: earliestYear,
+    });
+  },
+  closeTimeline: () => set({ timelineOpen: false, timelinePlaying: false }),
+  setTimelineYear: (value) =>
+    set((s) => ({
+      timelineYear:
+        typeof value === "function" ? value(s.timelineYear) : value,
+    })),
+  setTimelinePlaying: (value) => set({ timelinePlaying: value }),
+  setTimelineSpeed: (speed) => set({ timelineSpeed: speed }),
+  endRelationship: (id) => {
+    get().updateRelationship(id, {
+      endYear: getCurrentYear(),
+      isActive: false,
+    });
   },
 
   // -- legend actions --
@@ -371,13 +595,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set((s) => ({
       categoryLabels: { ...s.categoryLabels, [category]: label }
     }));
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
   updateCategoryColor: (category, color) => {
     set((s) => ({
       relationshipColors: { ...s.relationshipColors, [category]: color }
     }));
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
   addRelationshipType: (category, type) => {
     set((s) => ({
@@ -386,7 +610,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         [category]: [...(s.relationshipCatalog[category] || []), type]
       }
     }));
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
   removeRelationshipType: (category, type) => {
     set((s) => ({
@@ -395,7 +619,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         [category]: (s.relationshipCatalog[category] || []).filter(t => t !== type)
       }
     }));
-    scheduleSave(get);
+    scheduleSave(get, set);
   },
 }));
 

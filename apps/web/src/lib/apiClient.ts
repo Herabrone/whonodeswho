@@ -2,7 +2,18 @@ type ApiErrorBody = {
   message?: string | string[];
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+// Empty string means "use Vite proxy / same origin". Only set for non-proxied deploys.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -28,7 +39,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       // Ignore parse failures and keep the generic message.
     }
 
-    throw new Error(message);
+    throw new ApiRequestError(message, response.status);
   }
 
   if (response.status === 204) {

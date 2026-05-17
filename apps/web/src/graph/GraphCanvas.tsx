@@ -359,11 +359,19 @@ export function GraphCanvas() {
       proOptions={{ hideAttribution: true }}
       minZoom={0.2}
       maxZoom={2}
+      style={{ background: "var(--rf-graph-canvas)" }}
     >
-      <Background color="#d8d6cf" gap={28} />
-      <Controls showInteractive={false} />
-
-      {/* Collapsible MiniMap (bottom-right). Shows live miniature preview of the graph. */}
+      <Background color="var(--rf-graph-grid-dot)" gap={26} />
+      <Controls
+        showInteractive={false}
+        style={{
+          background: "var(--rf-graph-control-bg)",
+          borderColor: "var(--rf-graph-control-border)",
+          borderRadius: "8px",
+          color: "var(--rf-graph-control-text)",
+          backdropFilter: "blur(14px)",
+        }}
+      />
       <MinimapContainer nodes={nodes} edges={edges} />
       <ViewportPortal>
         {layoutMode === "tree" && treeShape === "grouped" && groupedDivider ? (
@@ -373,7 +381,7 @@ export function GraphCanvas() {
               transform: `translate(${groupedDivider.x}px, ${groupedDivider.yTop}px)`,
               width: 0,
               height: groupedDivider.yBottom - groupedDivider.yTop,
-              borderLeft: "2px solid rgba(134, 142, 150, 0.65)",
+              borderLeft: "2px solid rgba(150,145,140,0.5)",
               pointerEvents: "none",
             }}
           />
@@ -390,9 +398,11 @@ export function GraphCanvas() {
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   fontWeight: 600,
-                  opacity: 0.35,
+                  opacity: 0.92,
                   pointerEvents: "none",
-                  background: "rgba(255,255,255,0.42)",
+                  background: "var(--rf-graph-control-bg)",
+                  border: "1px solid var(--rf-graph-control-border)",
+                  backdropFilter: "blur(14px)",
                   borderRadius: 999,
                   padding: "2px 8px",
                 }}

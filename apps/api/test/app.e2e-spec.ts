@@ -12,8 +12,8 @@ import { SEED_GRAPH, SEED_POSITIONS } from './../src/auth/seed-data';
 import { PrismaService } from './../src/prisma/prisma.service';
 
 const projectRoot = join(__dirname, '..');
-const testDatabasePath = join(__dirname, 'relationflow.e2e.db');
-const testDatabaseUrl = 'file:../test/relationflow.e2e.db';
+const testDatabasePath = join(__dirname, 'whonodeswho.e2e.db');
+const testDatabaseUrl = 'file:../test/whonodeswho.e2e.db';
 
 function removeTestDatabase() {
   for (const filePath of [
@@ -58,7 +58,7 @@ describe('Auth and graph endpoints (e2e)', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL = testDatabaseUrl;
-    process.env.SESSION_SECRET = 'relationflow-e2e-secret';
+    process.env.SESSION_SECRET = 'whonodeswho-e2e-secret';
     removeTestDatabase();
     pushTestSchema();
 
@@ -77,7 +77,7 @@ describe('Auth and graph endpoints (e2e)', () => {
     app.use(cookieParser());
     app.use(
       session({
-        name: 'relationflow.sid',
+        name: 'whonodeswho.sid',
         secret: process.env.SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
@@ -116,7 +116,7 @@ describe('Auth and graph endpoints (e2e)', () => {
       }),
     );
     expect(response.headers['set-cookie']).toEqual(
-      expect.arrayContaining([expect.stringContaining('relationflow.sid=')]),
+      expect.arrayContaining([expect.stringContaining('whonodeswho.sid=')]),
     );
 
     const user = await prisma.user.findUniqueOrThrow({
@@ -160,7 +160,7 @@ describe('Auth and graph endpoints (e2e)', () => {
       }),
     });
     expect(response.headers['set-cookie']).toEqual(
-      expect.arrayContaining([expect.stringContaining('relationflow.sid=')]),
+      expect.arrayContaining([expect.stringContaining('whonodeswho.sid=')]),
     );
   });
 
