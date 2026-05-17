@@ -23,7 +23,24 @@ export class ActionsController {
     @Body() dto: ConfirmActionDto,
     @Req() request: SessionRequest,
   ): Promise<ConfirmActionResponse> {
-    const action = this.confirmationService.verify(dto.token);
-    return this.graphTools.executeAction(request.session.userId!, action);
+    const userId = request.session.userId!;
+    const storedResult = await this.confirmationService.getStoredResult(
+      dto.token,
+      userId,
+    );
+    if (storedResult) {
+      return storedResult;
+    }
+
+    const verified = await this.confirmationService.verify(dto.token, userId);
+    const result = await this.graphTools.executeAction(userId, verified.action);
+    await this.confirmationService.recordResult(
+      dto.token,
+      userId,
+      verified,
+      result,
+    );
+
+    return result;
   }
 }

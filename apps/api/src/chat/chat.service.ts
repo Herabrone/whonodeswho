@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { ChatSseEvent, PendingAction } from '@relationflow/contracts';
 import type OpenAI from 'openai';
 import { ConfirmationService } from '../confirmation/confirmation.service';
-import { GraphToolsService } from '../graph-tools/graph-tools.service';
+import { GraphToolExecutorService } from '../graph-tools/graph-tool-executor.service';
+import { errorToolResponse } from '../graph-tools/tool-response';
 import { OpenRouterService } from '../openrouter/openrouter.service';
 import {
   GRAPH_TOOL_SCHEMAS,
@@ -26,7 +27,7 @@ export class ChatService {
 
   constructor(
     private readonly openrouter: OpenRouterService,
-    private readonly graphTools: GraphToolsService,
+    private readonly graphTools: GraphToolExecutorService,
     private readonly conversationService: ConversationService,
     private readonly confirmationService: ConfirmationService,
   ) {}
@@ -92,7 +93,10 @@ export class ChatService {
           sendEvent({ type: 'tool_end', toolName: toolCall.function.name });
 
           if (result.pendingAction) {
-            const token = this.confirmationService.sign(result.pendingAction);
+            const token = this.confirmationService.sign(
+              userId,
+              result.pendingAction,
+            );
             sendEvent({
               type: 'pending_action',
               pendingAction: result.pendingAction,
@@ -129,9 +133,11 @@ export class ChatService {
       );
     } catch (error) {
       this.logger.error('Chat error:', error);
-      if (error && typeof error === 'object' && 'status' in error) {
+      if (this.isOpenRouterTransportError(error)) {
         this.logger.error(`OpenRouter HTTP status: ${(error as any).status}`);
-        this.logger.error(`OpenRouter error body: ${JSON.stringify((error as any).error ?? (error as any).message)}`);
+        this.logger.error(
+          `OpenRouter error body: ${JSON.stringify((error as any).error ?? (error as any).message)}`,
+        );
       }
       sendEvent({ type: 'error', message: this.errorMessage(error) });
     }
@@ -173,6 +179,17 @@ export class ChatService {
     const args = this.parseToolArguments(toolCall.function.arguments);
 
     switch (toolCall.function.name) {
+      case 'list_capabilities':
+        return {
+          data: await this.graphTools.listCapabilities(),
+        };
+      case 'resolve_person_reference':
+        return {
+          data: await this.graphTools.resolvePersonReference(
+            userId,
+            this.stringArg(args, 'text'),
+          ),
+        };
       case 'search_people':
         return {
           data: await this.graphTools.searchPeople(
@@ -205,18 +222,41 @@ export class ChatService {
             this.numberArg(args, 'depth', 2),
           ),
         };
-      case 'propose_create_relationship':
+      case 'check_duplicate_relationship':
         return {
-          pendingAction: await this.graphTools.proposeCreateRelationship(
+          data: await this.graphTools.checkDuplicateRelationship(
+            userId,
+            this.stringArg(args, 'fromPersonId'),
+            this.stringArg(args, 'toPersonId'),
+          ),
+        };
+      case 'suggest_relationship_type':
+        return {
+          data: await this.graphTools.suggestRelationshipType(
+            this.stringArg(args, 'freeText'),
+          ),
+        };
+      case 'propose_create_relationship':
+        {
+          const data = await this.graphTools.proposeCreateRelationship(
             userId,
             this.stringArg(args, 'fromPersonId'),
             this.stringArg(args, 'toPersonId'),
             this.stringArg(args, 'relationshipType'),
             this.optionalStringArg(args, 'notes'),
+          );
+          return {
+            data,
+            pendingAction: this.graphTools.extractPendingAction(data),
+          };
+        }
+      default:
+        return {
+          data: errorToolResponse(
+            'VALIDATION_ERROR',
+            `Unknown tool: ${toolCall.function.name}`,
           ),
         };
-      default:
-        return { data: { error: `Unknown tool: ${toolCall.function.name}` } };
     }
   }
 
@@ -256,6 +296,11 @@ export class ChatService {
   }
 
   private errorMessage(error: any): string {
+    if (this.isLocalHttpException(error)) {
+      return typeof error.message === 'string' && error.message.length > 0
+        ? error.message
+        : 'Chat request failed.';
+    }
     if (error?.status === 401) {
       return 'Authentication error: Check your OPENROUTER_API_KEY in the backend .env file.';
     }
@@ -266,5 +311,26 @@ export class ChatService {
       return error.message;
     }
     return 'Chat request failed.';
+  }
+
+  private isLocalHttpException(error: unknown): boolean {
+    return (
+      !!error &&
+      typeof error === 'object' &&
+      'response' in error &&
+      !!(error as any).response &&
+      typeof (error as any).response === 'object' &&
+      typeof (error as any).response.statusCode === 'number'
+    );
+  }
+
+  private isOpenRouterTransportError(error: unknown): boolean {
+    return (
+      !!error &&
+      typeof error === 'object' &&
+      'status' in error &&
+      typeof (error as any).status === 'number' &&
+      !this.isLocalHttpException(error)
+    );
   }
 }

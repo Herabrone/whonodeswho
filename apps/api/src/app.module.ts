@@ -7,6 +7,7 @@ import { ConfirmationModule } from './confirmation/confirmation.module';
 import { GraphModule } from './graph/graph.module';
 import { GraphToolsModule } from './graph-tools/graph-tools.module';
 import { HealthModule } from './health/health.module';
+import { McpModule } from './mcp/mcp.module';
 import { OpenRouterModule } from './openrouter/openrouter.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -25,6 +26,7 @@ import { PrismaModule } from './prisma/prisma.module';
     GraphToolsModule,
     OpenRouterModule,
     ConfirmationModule,
+    McpModule,
     ChatModule,
     HealthModule,
   ],

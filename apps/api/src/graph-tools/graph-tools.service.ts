@@ -23,6 +23,8 @@ import {
   isAllowedRelationshipType,
   type RelationshipType,
 } from './constants';
+import { resolvePersonReference as resolvePersonReferenceInList } from './reference-resolver';
+import { suggestRelationshipType as suggestRelationshipTypeValue } from './type-suggester';
 
 interface CreateRelationshipInput {
   fromPersonId: string;
@@ -76,6 +78,148 @@ export class GraphToolsService {
           .slice(0, 6)
           .map((relationship) => this.toContractRelationship(relationship)),
       }));
+  }
+
+  async listCapabilities() {
+    return {
+      version: '1.0.0',
+      tools: [
+        {
+          name: 'list_capabilities',
+          description: 'Enumerate the graph assistant tool surface.',
+          category: 'meta' as const,
+        },
+        {
+          name: 'resolve_person_reference',
+          description: 'Resolve natural-language person references to stable IDs.',
+          category: 'read' as const,
+        },
+        {
+          name: 'search_people',
+          description: 'Search people by name or partial name.',
+          category: 'read' as const,
+        },
+        {
+          name: 'get_person',
+          description: 'Fetch one person and their relationships.',
+          category: 'read' as const,
+        },
+        {
+          name: 'find_path',
+          description: 'Find the shortest path between two people.',
+          category: 'read' as const,
+        },
+        {
+          name: 'get_neighborhood',
+          description: 'Get a local subgraph around one person.',
+          category: 'read' as const,
+        },
+        {
+          name: 'check_duplicate_relationship',
+          description: 'Check whether any relationship already exists between two people.',
+          category: 'read' as const,
+        },
+        {
+          name: 'suggest_relationship_type',
+          description: 'Map free text to a canonical relationship type.',
+          category: 'read' as const,
+        },
+        {
+          name: 'propose_create_relationship',
+          description: 'Create a pending relationship proposal for user confirmation.',
+          category: 'propose-write' as const,
+        },
+      ],
+      writeProtections: [
+        'All writes require user confirmation.',
+        'The backend executes writes only after confirmation.',
+      ],
+      rateLimits: {
+        readsPerMinute: Number(process.env.CHAT_RATE_LIMIT_MAX_REQUESTS ?? 20),
+        writesPerMessage: 1,
+      },
+    };
+  }
+
+  async resolvePersonReference(userId: string, text: string) {
+    await this.ensureGraphLoaded(userId);
+    const [people, relationships] = await Promise.all([
+      this.prisma.person.findMany({
+        where: { userId },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.relationship.findMany({ where: { userId } }),
+    ]);
+
+    const directRelationshipCount = new Map<string, number>();
+    for (const relationship of relationships) {
+      directRelationshipCount.set(
+        relationship.sourceId,
+        (directRelationshipCount.get(relationship.sourceId) ?? 0) + 1,
+      );
+      directRelationshipCount.set(
+        relationship.targetId,
+        (directRelationshipCount.get(relationship.targetId) ?? 0) + 1,
+      );
+    }
+
+    const result = resolvePersonReferenceInList(
+      text,
+      people.map((person) => ({
+        id: person.id,
+        name: person.name,
+        notes: person.notes,
+        aliasesJson: (person as DbPerson & { aliasesJson?: string | null }).aliasesJson,
+        directRelationshipCount: directRelationshipCount.get(person.id) ?? 0,
+      })),
+    );
+
+    if (!result) {
+      throw new NotFoundException(`No person matching "${text}" was found.`);
+    }
+
+    return result;
+  }
+
+  async suggestRelationshipType(freeText: string) {
+    return suggestRelationshipTypeValue(freeText);
+  }
+
+  async checkDuplicateRelationship(
+    userId: string,
+    fromPersonId: string,
+    toPersonId: string,
+  ) {
+    await this.ensureGraphLoaded(userId);
+
+    const [fromPerson, toPerson, relationships] = await Promise.all([
+      this.prisma.person.findUnique({
+        where: { userId_id: { userId, id: fromPersonId } },
+      }),
+      this.prisma.person.findUnique({
+        where: { userId_id: { userId, id: toPersonId } },
+      }),
+      this.prisma.relationship.findMany({ where: { userId } }),
+    ]);
+
+    if (!fromPerson || !toPerson) {
+      throw new NotFoundException('One or both people were not found.');
+    }
+
+    const existing = relationships
+      .filter(
+        (relationship) =>
+          (relationship.sourceId === fromPersonId &&
+            relationship.targetId === toPersonId) ||
+          (relationship.sourceId === toPersonId &&
+            relationship.targetId === fromPersonId),
+      )
+      .map((relationship) => this.toContractRelationship(relationship));
+
+    return {
+      hasDuplicate: existing.length > 0,
+      existing,
+    };
   }
 
   async getPerson(userId: string, personId: string) {
