@@ -78,6 +78,14 @@ export const primitives = {
     dmSubtle: "rgba(240,160,48,0.15)",
     glow: "rgba(240,160,48,0.5)",
   },
+  cyan: {
+    ui: "#0C8599",
+    gfx: "#22B8CF",
+    text: "#0B7285",
+    subtle: "#E3FAFC",
+    dmSubtle: "rgba(34,184,207,0.15)",
+    glow: "rgba(34,184,207,0.5)",
+  },
   stone: {
     ui: "#868E96",
     gfx: "#9B9B9B",
@@ -102,6 +110,7 @@ export const categoryTokens: Record<RelationshipCategory, CategoryToken> = {
   friend: primitives.green,
   romantic: primitives.pink,
   work: primitives.amber,
+  education: primitives.cyan,
   other: primitives.stone,
 };
 
@@ -431,6 +440,9 @@ export function buildCssVars(): string {
     --rf-cat-work-ui: ${categoryTokens.work.ui};
     --rf-cat-work-gfx: ${categoryTokens.work.gfx};
     --rf-cat-work-subtle: ${categoryTokens.work.subtle};
+    --rf-cat-education-ui: ${categoryTokens.education.ui};
+    --rf-cat-education-gfx: ${categoryTokens.education.gfx};
+    --rf-cat-education-subtle: ${categoryTokens.education.subtle};
     --rf-cat-other-ui: ${categoryTokens.other.ui};
     --rf-cat-other-gfx: ${categoryTokens.other.gfx};
     --rf-cat-other-subtle: ${categoryTokens.other.subtle};
@@ -548,6 +560,7 @@ export function buildCssVars(): string {
     --rf-cat-friend-subtle: ${categoryTokens.friend.dmSubtle};
     --rf-cat-romantic-subtle: ${categoryTokens.romantic.dmSubtle};
     --rf-cat-work-subtle: ${categoryTokens.work.dmSubtle};
+    --rf-cat-education-subtle: ${categoryTokens.education.dmSubtle};
     --rf-cat-other-subtle: ${categoryTokens.other.dmSubtle};
   `;
 

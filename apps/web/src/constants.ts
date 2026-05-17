@@ -14,6 +14,7 @@ export const CATEGORY_GFX_COLORS: Record<RelationshipCategory, string> = {
   friend: getCategoryGfxColor("friend"),
   romantic: getCategoryGfxColor("romantic"),
   work: getCategoryGfxColor("work"),
+  education: getCategoryGfxColor("education"),
   other: getCategoryGfxColor("other"),
 };
 
@@ -22,6 +23,7 @@ export const CATEGORY_UI_COLORS: Record<RelationshipCategory, string> = {
   friend: getCategoryUiColor("friend"),
   romantic: getCategoryUiColor("romantic"),
   work: getCategoryUiColor("work"),
+  education: getCategoryUiColor("education"),
   other: getCategoryUiColor("other"),
 };
 
@@ -34,6 +36,7 @@ export const CATEGORIES: RelationshipCategory[] = [
   "friend",
   "romantic",
   "work",
+  "education",
   "other",
 ];
 
@@ -42,6 +45,7 @@ export const CATEGORY_LABELS: Record<RelationshipCategory, string> = {
   friend: "Friend",
   romantic: "Romantic",
   work: "Work",
+  education: "Education",
   other: "Other",
 };
 
@@ -72,7 +76,8 @@ export const RELATIONSHIP_CATALOG: Record<RelationshipCategory, string[]> = {
   friend: ["friend", "close friend", "best friend", "acquaintance"],
   romantic: ["partner", "spouse", "ex-partner", "ex-spouse"],
   work: ["coworker", "manager", "employee", "business partner", "client"],
-  other: ["mentor", "mentee", "roommate", "classmate", "neighbour", "custom"],
+  education: ["classmate"],
+  other: ["mentor", "mentee", "roommate", "neighbour", "custom"],
 };
 
 /** Relationship types considered "weak" — Track C can hide these. */
