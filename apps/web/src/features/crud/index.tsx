@@ -23,6 +23,7 @@ import {
   type OpenQuickAddRelationshipsDetail,
 } from "./relationshipComposerEvent";
 import { YearMonthPicker } from "../timeline/YearMonthPicker";
+import { RelationshipTransitionDialog } from "../timeline/RelationshipTransitionDialog";
 import { validateRelationshipDrafts } from "../../domain/rules/validationRules";
 import { createRelationshipKey, inferAutoRelationships } from "./useAutoRelationships";
 import ConfirmRelationshipsDialog, { ProposalItem } from "./ConfirmRelationshipsDialog";
@@ -191,6 +192,7 @@ export function CrudFeature() {
   const [relationshipError, setRelationshipError] = useState("");
   const [endConfirmId, setEndConfirmId] = useState<string | null>(null);
   const [endConfirmYear, setEndConfirmYear] = useState<number>(new Date().getFullYear());
+  const [transitionThreadId, setTransitionThreadId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPrimary, setConfirmPrimary] = useState<ProposalItem | null>(null);
   const [confirmProposals, setConfirmProposals] = useState<ProposalItem[]>([]);
@@ -240,6 +242,7 @@ export function CrudFeature() {
   const updateRelationship = useGraphStore((s) => s.updateRelationship);
   const deleteRelationship = useGraphStore((s) => s.deleteRelationship);
   const endRelationship = useGraphStore((s) => s.endRelationship);
+  const ensureLegacyRelationshipMigrated = useGraphStore((s) => s.ensureLegacyRelationshipMigrated);
   const replaceGraph = useGraphStore((s) => s.replaceGraph);
 
   const selectRelationship = useGraphStore((s) => s.selectRelationship);
@@ -810,16 +813,28 @@ export function CrudFeature() {
                       Reactivate
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEndConfirmId(selectedRelationship.id);
-                        setEndConfirmYear(new Date().getFullYear());
-                      }}
-                      className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm text-red-700"
-                    >
-                      End this relationship
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const { threadId } = ensureLegacyRelationshipMigrated(selectedRelationship);
+                          setTransitionThreadId(threadId);
+                        }}
+                        className="rounded-lg border border-rf-border bg-rf-subtle px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
+                      >
+                        Change relationship
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEndConfirmId(selectedRelationship.id);
+                          setEndConfirmYear(new Date().getFullYear());
+                        }}
+                        className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm text-red-700"
+                      >
+                        End this relationship
+                      </button>
+                    </>
                   )}
                 </div>
                 {selectedRelationship.isActive !== false && endConfirmId === selectedRelationship.id ? (
@@ -875,6 +890,13 @@ export function CrudFeature() {
             )}
           </div>
         </div>
+      )}
+
+      {transitionThreadId && (
+        <RelationshipTransitionDialog
+          threadId={transitionThreadId}
+          onClose={() => setTransitionThreadId(null)}
+        />
       )}
 
       {(modal.type === "person-create" || modal.type === "person-edit") && (

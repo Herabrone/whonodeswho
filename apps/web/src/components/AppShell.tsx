@@ -6,6 +6,7 @@ import { useState, type ReactNode, useRef, useEffect } from "react";
 import { themeStorage, type ThemeName } from "../design-tokens";
 import { Legend } from "./Legend";
 import { TimelineToggleButton } from "./TimelineToggleButton";
+import { TimelineDateChip } from "../features/timeline/TimelineDateChip";
 import { useGraphStore } from "../store/useGraphStore";
 import { useAuth } from "../auth/AuthContext";
 import { dispatchOpenImportExport } from "../features/crud/relationshipComposerEvent";
@@ -54,6 +55,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
   const selectedPersonId = useGraphStore((s) => s.selectedPersonId);
   const persistenceError = useGraphStore((s) => s.persistenceError);
   const recoveryDraft = useGraphStore((s) => s.recoveryDraft);
+  const timelineOpen = useGraphStore((s) => s.timelineOpen);
   const setLayoutMode = useGraphStore((s) => s.setLayoutMode);
   const setTreeShape = useGraphStore((s) => s.setTreeShape);
   const setTreeRoot = useGraphStore((s) => s.setTreeRoot);
@@ -165,6 +167,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
             </div>
           ) : null}
           <TimelineToggleButton />
+          {timelineOpen ? <TimelineDateChip /> : null}
           <div className="inline-flex rounded-full border border-rf-border bg-rf-base p-0.5 text-xs">
             <button
               type="button"

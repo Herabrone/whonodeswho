@@ -20,10 +20,20 @@ import type {
   PersonInput,
   Relationship,
   RelationshipCategory,
+  RelationshipEpisode,
+  RelationshipEvent,
   RelationshipInput,
+  RelationshipThread,
   TreeShape,
   XYPosition,
 } from "../types";
+import type { TransitionOutcome, TransitionResult } from "../domain/timeline/transitionTypes";
+import { isValidEpisodeKind } from "../domain/timeline/transitionEngine";
+import {
+  makeThreadId,
+  normalizeThreadParticipants,
+} from "../domain/timeline/timelineTypes";
+import { migrateLegacyRelationshipToEpisode } from "../domain/timeline/timelineMigration";
 import {
   CATEGORIES,
   CATEGORY_COLORS,
@@ -92,10 +102,17 @@ interface TimelineSlice {
   timelineSpeed: 1 | 2 | 3;
 }
 
+interface HistorySlice {
+  threads: Record<string, RelationshipThread>;
+  episodes: Record<string, RelationshipEpisode>;
+  events: Record<string, RelationshipEvent>;
+}
+
 interface Lifecycle {
   hydrated: boolean;
   _persistence: RelationshipStore | null;
   _drafts: DraftStore | null;
+  _historyKey: string | null;
   persistenceError: string | null;
   recoveryDraft: PersistedDraft | null;
 }
@@ -107,6 +124,7 @@ export interface GraphStore
     FocusSlice,
     LayoutSlice,
     TimelineSlice,
+    HistorySlice,
     Lifecycle {
   // -- lifecycle --
   hydrate: (userId: string) => Promise<void>;
@@ -159,6 +177,19 @@ export interface GraphStore
   setTimelinePlaying: (value: boolean) => void;
   setTimelineSpeed: (speed: 1 | 2 | 3) => void;
   endRelationship: (id: string, endYear?: number) => void;
+
+  // -- history actions (Temporal feature) --
+  /**
+   * Close one episode and optionally open a successor at the same date.
+   * Creates a milestone event at the transition date.
+   * Returns { ok: false, error } on validation failure.
+   */
+  applyTransition: (threadId: string, outcome: TransitionOutcome) => TransitionResult;
+  /**
+   * Ensure a legacy Relationship is represented in the HistorySlice.
+   * Idempotent — safe to call multiple times for the same relationship.
+   */
+  ensureLegacyRelationshipMigrated: (relationship: Relationship) => { threadId: string; episodeId: string };
 
   // -- legend actions (Contract Amendment) --
   updateCategoryLabel: (category: RelationshipCategory, label: string) => void;
@@ -357,6 +388,44 @@ const TIMELINE_DEFAULTS: TimelineSlice = {
   timelineSpeed: 1,
 };
 
+const HISTORY_DEFAULTS: HistorySlice = {
+  threads: {},
+  episodes: {},
+  events: {},
+};
+
+function getHistoryKey(userId: string): string {
+  return `whonodeswho:history:v1:${userId}`;
+}
+
+function loadHistoryFromStorage(key: string): HistorySlice {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return { ...HISTORY_DEFAULTS };
+    const parsed = JSON.parse(raw) as Partial<HistorySlice>;
+    return {
+      threads: parsed.threads ?? {},
+      episodes: parsed.episodes ?? {},
+      events: parsed.events ?? {},
+    };
+  } catch {
+    return { ...HISTORY_DEFAULTS };
+  }
+}
+
+function saveHistoryToStorage(
+  key: string,
+  threads: Record<string, RelationshipThread>,
+  episodes: Record<string, RelationshipEpisode>,
+  events: Record<string, RelationshipEvent>,
+): void {
+  try {
+    localStorage.setItem(key, JSON.stringify({ threads, episodes, events }));
+  } catch (err) {
+    console.error("[useGraphStore] history save failed:", err);
+  }
+}
+
 export const useGraphStore = create<GraphStore>((set, get) => ({
   // initial state
   people: [],
@@ -368,12 +437,14 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   ...LEGEND_DEFAULTS,
   ...LAYOUT_DEFAULTS,
   ...TIMELINE_DEFAULTS,
+  ...HISTORY_DEFAULTS,
   focusPersonId: null,
   focusDegrees: 1,
   pathPersonIds: [],
   hydrated: false,
   _persistence: null,
   _drafts: null,
+  _historyKey: null,
   persistenceError: null,
   recoveryDraft: null,
 
@@ -381,10 +452,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   hydrate: async (userId) => {
     const store = createPersistenceStore();
     const drafts = createDraftStore(userId);
+    const historyKey = getHistoryKey(userId);
     const [persisted, draft] = await Promise.all([
       store.load().catch(() => EMPTY_STATE),
       drafts.load().catch(() => null),
     ]);
+    const history = loadHistoryFromStorage(historyKey);
 
     set({
       people: persisted.graph.people,
@@ -393,6 +466,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       layoutMode: persisted.layout?.layoutMode ?? LAYOUT_DEFAULTS.layoutMode,
       treeShape: persisted.layout?.treeShape ?? LAYOUT_DEFAULTS.treeShape,
       treeRootId: persisted.layout?.treeRootId ?? LAYOUT_DEFAULTS.treeRootId,
+      ...history,
+      _historyKey: historyKey,
       hydrated: true,
       _persistence: store,
       _drafts: drafts,
@@ -443,6 +518,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       focusPersonId: null,
       pathPersonIds: [],
       ...TIMELINE_DEFAULTS,
+      ...HISTORY_DEFAULTS,
+      _historyKey: null,
       hydrated: false,
       _persistence: null,
       _drafts: null,
@@ -645,6 +722,147 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       endYear: endYear ?? getCurrentYear(),
       isActive: false,
     });
+  },
+
+  // -- history actions --
+  applyTransition: (threadId, outcome) => {
+    const { episodes, events, threads, _historyKey } = get();
+
+    // 1. Find episode
+    const episode = episodes[outcome.closedEpisodeId];
+    if (!episode) return { ok: false, error: "Episode not found." };
+
+    // 2. Validate episode belongs to the thread
+    if (episode.threadId !== threadId) {
+      return { ok: false, error: "Episode does not belong to this thread." };
+    }
+
+    // 3. Validate thread exists and has valid person references
+    const thread = threads[threadId];
+    if (!thread) return { ok: false, error: "Thread not found." };
+    const people = get().people;
+    if (!people.some((p) => p.id === thread.personAId) || !people.some((p) => p.id === thread.personBId)) {
+      return { ok: false, error: "One or both people in this thread no longer exist." };
+    }
+
+    // 4. Validate transition date >= episode start date
+    if (outcome.transitionDate < episode.startDate) {
+      return {
+        ok: false,
+        error: `Transition date cannot be before the episode started (${episode.startDate.slice(0, 4)}).`,
+      };
+    }
+
+    // 5. Validate new episode kind and check for duplicates
+    if (outcome.newEpisode) {
+      if (!isValidEpisodeKind(outcome.newEpisode.kind)) {
+        return { ok: false, error: `Unknown episode kind: ${outcome.newEpisode.kind}.` };
+      }
+      const duplicate = Object.values(episodes).find(
+        (ep) =>
+          ep.threadId === threadId &&
+          ep.kind === outcome.newEpisode!.kind &&
+          !ep.endDate &&
+          ep.id !== outcome.closedEpisodeId,
+      );
+      if (duplicate) {
+        return {
+          ok: false,
+          error: `This pair already has an active ${outcome.newEpisode.kind.replace(/_/g, " ")} relationship.`,
+        };
+      }
+    }
+
+    // Soft warnings
+    let warning: string | undefined;
+    const transitionYear = parseInt(outcome.transitionDate.slice(0, 4), 10);
+    if (transitionYear > getCurrentYear() + 1) {
+      warning = "The transition date is more than one year in the future.";
+    } else if (episode.certainty === "unknown") {
+      warning = "The closing episode had an uncertain start date.";
+    }
+
+    // 6. Build new records
+    const newEpisodeRecord: RelationshipEpisode | null = outcome.newEpisode
+      ? {
+          id: newId(),
+          threadId,
+          kind: outcome.newEpisode.kind,
+          startDate: outcome.transitionDate,
+          certainty: outcome.newEpisode.certainty,
+          source: "user",
+          ...(outcome.newEpisode.notes ? { notes: outcome.newEpisode.notes } : {}),
+        }
+      : null;
+
+    const eventRecord: RelationshipEvent = {
+      id: newId(),
+      threadId,
+      date: outcome.transitionDate,
+      type: outcome.event?.type ?? "milestone",
+      title: outcome.event?.title ?? "Relationship changed",
+    };
+
+    // 7. Apply mutations
+    const updatedEpisodes: Record<string, RelationshipEpisode> = {
+      ...episodes,
+      [outcome.closedEpisodeId]: { ...episode, endDate: outcome.transitionDate },
+      ...(newEpisodeRecord ? { [newEpisodeRecord.id]: newEpisodeRecord } : {}),
+    };
+    const updatedEvents: Record<string, RelationshipEvent> = {
+      ...events,
+      [eventRecord.id]: eventRecord,
+    };
+
+    set({ episodes: updatedEpisodes, events: updatedEvents });
+
+    // 8. Persist history to localStorage
+    if (_historyKey) {
+      saveHistoryToStorage(_historyKey, threads, updatedEpisodes, updatedEvents);
+    }
+
+    return { ok: true, ...(warning ? { warning } : {}) };
+  },
+
+  ensureLegacyRelationshipMigrated: (relationship) => {
+    const threadId = makeThreadId(relationship.source, relationship.target);
+    const episodeId = `episode:${relationship.id}`;
+    const { threads, episodes, events, _historyKey } = get();
+
+    let needsSave = false;
+    const updatedThreads = { ...threads };
+    const updatedEpisodes = { ...episodes };
+
+    if (!updatedThreads[threadId]) {
+      const [personAId, personBId] = normalizeThreadParticipants(
+        relationship.source,
+        relationship.target,
+      );
+      updatedThreads[threadId] = {
+        id: threadId,
+        personAId,
+        personBId,
+        ...(relationship.color ? { colorOverride: relationship.color } : {}),
+        createdAt: relationship.createdAt,
+        updatedAt: relationship.updatedAt,
+      };
+      needsSave = true;
+    }
+
+    if (!updatedEpisodes[episodeId]) {
+      const episode = migrateLegacyRelationshipToEpisode(relationship, threadId);
+      updatedEpisodes[episodeId] = episode;
+      needsSave = true;
+    }
+
+    if (needsSave) {
+      set({ threads: updatedThreads, episodes: updatedEpisodes });
+      if (_historyKey) {
+        saveHistoryToStorage(_historyKey, updatedThreads, updatedEpisodes, events);
+      }
+    }
+
+    return { threadId, episodeId };
   },
 
   // -- legend actions --
