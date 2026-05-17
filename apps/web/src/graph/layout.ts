@@ -194,25 +194,54 @@ export function computeTreeLayout(
   const positions: Record<string, XYPosition> = {};
 
   if (shape === "radial") {
+    // 1 — Group items by depth to calculate adaptive ring sizes
+    const nodesByDepth: Record<number, string[]> = {};
+    for (const [id, depth] of Object.entries(structure.depthById)) {
+      if (!nodesByDepth[depth]) nodesByDepth[depth] = [];
+      nodesByDepth[depth].push(id);
+    }
+
+    const depthRadii: Record<number, number> = { 0: 0 };
+    const MIN_ARC_SPACING = 100; // Minimum arc-length distance between nodes on a ring
+
     const maxDepth = Math.max(...Object.values(structure.depthById), 0);
-    const levelGap = 170;
-    const maxRadius = Math.max(220, maxDepth * levelGap);
+    for (let d = 1; d <= maxDepth; d++) {
+      const nodesOnRing = nodesByDepth[d]?.length ?? 0;
+      const prevRadius = depthRadii[d - 1] ?? 0;
+
+      // Rule: At least 250px for the first ring, then at least 200px increments.
+      const minRadiusIncrement = d === 1 ? 250 : 200;
+      let radius = prevRadius + minRadiusIncrement;
+
+      // Dynamic adjustment: Ensure enough arc length (Circumference / Count >= MIN_ARC_SPACING)
+      // Radius must be at least (MIN_ARC_SPACING * Count) / (2 * PI)
+      if (nodesOnRing > 0) {
+        const requiredRadius = (MIN_ARC_SPACING * nodesOnRing) / (2 * Math.PI);
+        if (requiredRadius > radius) {
+          radius = requiredRadius;
+        }
+      }
+      depthRadii[d] = radius;
+    }
+
     const radial = tree<TreeHierarchyDatum>().size([
       Math.PI * 2,
-      maxRadius,
+      1, // normalization factor, we'll use depthRadii
     ]);
     const laidOut = radial(hierarchyRoot);
 
     for (const node of laidOut.descendants()) {
       const angle = node.x - Math.PI / 2;
-      const radius = node.y;
+      const depth = node.depth;
+      const radius = depthRadii[depth] ?? 0;
+
       positions[node.data.id] = {
         x: radius * Math.cos(angle),
         y: radius * Math.sin(angle),
       };
     }
   } else {
-    const layered = tree<TreeHierarchyDatum>().nodeSize([170, 160]);
+    const layered = tree<TreeHierarchyDatum>().nodeSize([200, 220]);
     const laidOut = layered(hierarchyRoot);
 
     for (const node of laidOut.descendants()) {
@@ -258,7 +287,7 @@ export function computeRadialCategoryLabels(
   const maxRadius = Object.values(positions).reduce((acc, point) => {
     return Math.max(acc, Math.hypot(point.x, point.y));
   }, 0);
-  const labelRadius = maxRadius + 120;
+  const labelRadius = maxRadius + 60;
 
   return CATEGORY_ORDER.flatMap((category) => {
     const points = groups.get(category);

@@ -11,13 +11,13 @@ const ORDERED_CATEGORIES: RelationshipCategory[] = [
 ];
 
 // Increased spacing to reduce label overlap in grouped tree view
-const LEVEL_GAP = 170;
-const NODE_W = 110;
+const LEVEL_GAP = 220;
+const NODE_W = 160;
 const NODE_H = 44;
-const CAT_W = 110;
+const CAT_W = 160;
 const CAT_H = 44;
-const H_GAP = 28;
-const CAT_GROUP_GAP = H_GAP * 3;
+const H_GAP = 40;
+const CAT_GROUP_GAP = H_GAP * 4;
 
 interface CategoryConnection {
   personId: string;

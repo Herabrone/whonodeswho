@@ -19,6 +19,8 @@ import {
   OPEN_RELATIONSHIP_COMPOSER_EVENT,
   type OpenRelationshipComposerDetail,
   OPEN_IMPORT_EXPORT_EVENT,
+  OPEN_QUICK_ADD_RELATIONSHIPS_EVENT,
+  type OpenQuickAddRelationshipsDetail,
 } from "./relationshipComposerEvent";
 import { YearMonthPicker } from "../timeline/YearMonthPicker";
 import { validateRelationshipDrafts } from "../../domain/rules/validationRules";
@@ -278,11 +280,19 @@ export function CrudFeature() {
     const onOpenImportExport = () => setModal({ type: "import-export" });
     window.addEventListener(OPEN_IMPORT_EXPORT_EVENT, onOpenImportExport);
 
+    const onOpenQuickAdd = (event: Event) => {
+      const customEvent = event as CustomEvent<OpenQuickAddRelationshipsDetail>;
+      const p = people.find((x) => x.id === customEvent.detail.personId);
+      if (p) setQuickAddPerson(p);
+    };
+    window.addEventListener(OPEN_QUICK_ADD_RELATIONSHIPS_EVENT, onOpenQuickAdd);
+
     return () => {
       window.removeEventListener(OPEN_RELATIONSHIP_COMPOSER_EVENT, onOpenComposer);
       window.removeEventListener(OPEN_IMPORT_EXPORT_EVENT, onOpenImportExport);
+      window.removeEventListener(OPEN_QUICK_ADD_RELATIONSHIPS_EVENT, onOpenQuickAdd);
     };
-  }, []);
+  }, [people]); // dependency on people since we use it in the event listener
 
   function sanitizeFileName(name: string) {
     if (!name) return "";

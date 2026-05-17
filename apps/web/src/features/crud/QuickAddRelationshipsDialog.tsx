@@ -190,7 +190,7 @@ export default function QuickAddRelationshipsDialog({ open, person, onClose }: P
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                       <label className="text-sm text-rf-text">
                         Category
-                        <select value={cfg.category} onChange={(e) => updatePerPerson(id, { category: e.target.value as any, typeChoice: resolveInitialType(e.target.value as any), customType: "" })} className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-2 py-1 text-sm">
+                        <select value={cfg.category} onChange={(e) => updatePerPerson(id, { category: e.target.value as any, typeChoice: resolveInitialType(e.target.value as any), customType: "", direction: "two-way" })} className="mt-1 w-full rounded-lg border border-rf-border bg-rf-subtle px-2 py-1 text-sm">
                           {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
                       </label>

@@ -2,7 +2,7 @@
  * AppShell - application chrome.
  * Renders the header and hosts the graph canvas plus the feature overlays.
  */
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, useRef, useEffect } from "react";
 import { themeStorage, type ThemeName } from "../design-tokens";
 import { Legend } from "./Legend";
 import { TimelineToggleButton } from "./TimelineToggleButton";
@@ -10,11 +10,28 @@ import { useGraphStore } from "../store/useGraphStore";
 import { useAuth } from "../auth/AuthContext";
 import { dispatchOpenImportExport } from "../features/crud/relationshipComposerEvent";
 
-
 interface AppShellProps {
   canvas: ReactNode;
   overlays: ReactNode;
 }
+
+const TREE_SHAPES = [
+  {
+    id: "grouped",
+    label: "Grouped",
+    description: "Focus on the root person and their immediate connections grouped by category.",
+  },
+  {
+    id: "radial",
+    label: "Radial",
+    description: "Spread connections outward in concentric rings, showing depth and generations.",
+  },
+  {
+    id: "layered",
+    label: "Layered",
+    description: "Classic top-down hierarchy showing clear generations or levels of separation.",
+  },
+] as const;
 
 export function AppShell({ canvas, overlays }: AppShellProps) {
   const [theme, setTheme] = useState<ThemeName>(() => {
@@ -27,6 +44,10 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
 
     return themeStorage.get();
   });
+
+  const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const layoutMode = useGraphStore((s) => s.layoutMode);
   const treeShape = useGraphStore((s) => s.treeShape);
   const treeRootId = useGraphStore((s) => s.treeRootId);
@@ -42,10 +63,22 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
 
   const { signOut } = useAuth();
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShapeMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const applyTheme = (nextTheme: ThemeName) => {
     setTheme(nextTheme);
     themeStorage.set(nextTheme);
   };
+
+  const currentShape = TREE_SHAPES.find((s) => s.id === treeShape) ?? TREE_SHAPES[0];
 
   return (
     <div className="flex h-screen w-screen flex-col bg-rf-base">
@@ -83,37 +116,52 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
             </button>
           </div>
           {layoutMode === "tree" ? (
-            <div className="inline-flex rounded-full border border-rf-border bg-rf-base p-0.5 text-xs">
+            <div className="relative" ref={menuRef}>
               <button
                 type="button"
-                className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                  treeShape === "grouped" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
-                }`}
-                onClick={() => {
-                  setTreeShape("grouped");
-                  if (selectedPersonId) setTreeRoot(selectedPersonId);
-                }}
+                onClick={() => setShapeMenuOpen(!shapeMenuOpen)}
+                className="flex items-center gap-2 rounded-full border border-rf-border bg-rf-base px-4 py-1.5 text-xs font-medium text-rf-text transition-colors hover:bg-rf-surface"
               >
-                Grouped
+                <span>Layout: {currentShape.label}</span>
+                <svg
+                  className={`h-3 w-3 transition-transform ${shapeMenuOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
-              <button
-                type="button"
-                className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                  treeShape === "radial" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
-                }`}
-                onClick={() => setTreeShape("radial")}
-              >
-                Radial
-              </button>
-              <button
-                type="button"
-                className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                  treeShape === "layered" ? "bg-rf-surface text-rf-text" : "text-rf-muted hover:text-rf-text"
-                }`}
-                onClick={() => setTreeShape("layered")}
-              >
-                Layered
-              </button>
+
+              {shapeMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 origin-top-right rounded-xl border border-rf-border bg-rf-surface p-1 shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                  <div className="py-1">
+                    {TREE_SHAPES.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => {
+                          setTreeShape(option.id as any);
+                          if (option.id === "grouped" && selectedPersonId) {
+                            setTreeRoot(selectedPersonId);
+                          }
+                          setShapeMenuOpen(false);
+                        }}
+                        className={`flex w-full flex-col px-4 py-3 text-left transition-colors hover:bg-rf-subtle ${
+                          treeShape === option.id ? "bg-rf-subtle/50" : ""
+                        }`}
+                      >
+                        <span className={`text-sm font-semibold ${treeShape === option.id ? "text-rf-accent" : "text-rf-text"}`}>
+                          {option.label}
+                        </span>
+                        <span className="mt-1 text-xs leading-relaxed text-rf-muted">
+                          {option.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : null}
           <TimelineToggleButton />

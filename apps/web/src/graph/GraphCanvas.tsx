@@ -25,7 +25,10 @@ import { PersonNode } from "./PersonNode";
 import { useGraphView } from "./useGraphView";
 import { useGraphStore } from "../store/useGraphStore";
 import { FloatingEdge } from "./FloatingEdge";
-import { dispatchOpenRelationshipComposer } from "../features/crud/relationshipComposerEvent";
+import {
+  dispatchOpenRelationshipComposer,
+  dispatchOpenQuickAddRelationships,
+} from "../features/crud/relationshipComposerEvent";
 import { dispatchOpenPathModal } from "../features/intelligence/pathEvent";
 import { CategoryNode } from "./CategoryNode";
 import { CATEGORY_COLORS } from "../constants";
@@ -122,10 +125,10 @@ function ContextMenu({
         </button>
 
         <button
-          onClick={() => handleAction(() => dispatchOpenRelationshipComposer({ sourceId: id, targetId: "" }))}
+          onClick={() => handleAction(() => dispatchOpenQuickAddRelationships({ personId: id }))}
           className="flex w-full items-center px-3 py-2 text-left text-sm text-rf-text hover:bg-rf-subtle"
         >
-          Add Relationship...
+          Add Relationships...
         </button>
 
         <button
@@ -561,17 +564,18 @@ export function GraphCanvas() {
                   position: "absolute",
                   transform: `translate(${item.position.x}px, ${item.position.y}px) translate(-50%, -50%)`,
                   color: item.color,
-                  fontSize: 12,
-                  letterSpacing: "0.08em",
+                  fontSize: 16,
+                  letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  fontWeight: 600,
-                  opacity: 0.92,
+                  fontWeight: 800,
+                  opacity: 0.95,
                   pointerEvents: "none",
                   background: "var(--rf-graph-control-bg)",
-                  border: "1px solid var(--rf-graph-control-border)",
+                  border: "2px solid var(--rf-graph-control-border)",
                   backdropFilter: "blur(14px)",
                   borderRadius: 999,
-                  padding: "2px 8px",
+                  padding: "4px 12px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                 }}
               >
                 {item.label}

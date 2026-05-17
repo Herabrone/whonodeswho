@@ -8,6 +8,8 @@ export function Legend() {
   const categoryLabels = useGraphStore((s) => s.categoryLabels);
   const relationshipColors = useGraphStore((s) => s.relationshipColors);
   const relationshipCatalog = useGraphStore((s) => s.relationshipCatalog);
+  const showLabels = useGraphStore((s) => s.showLabels);
+  const setShowLabels = useGraphStore((s) => s.setShowLabels);
   const updateCategoryLabel = useGraphStore((s) => s.updateCategoryLabel);
   const updateCategoryColor = useGraphStore((s) => s.updateCategoryColor);
   const addRelationshipType = useGraphStore((s) => s.addRelationshipType);
@@ -98,6 +100,21 @@ export function Legend() {
                 )}
               </div>
             ))}
+          </div>
+
+          <div className="mt-4 border-t border-rf-border pt-3">
+            <label className="flex cursor-pointer items-center justify-between text-xs font-medium text-rf-text">
+              <span>Relationship Labels</span>
+              <div className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={showLabels}
+                  onChange={(e) => setShowLabels(e.target.checked)}
+                />
+                <div className="peer h-5 w-9 rounded-full bg-rf-subtle after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-rf-accent peer-checked:after:translate-x-full peer-checked:after:border-white focus:outline-none"></div>
+              </div>
+            </label>
           </div>
         </div>
       )}
