@@ -62,7 +62,7 @@ export const RELATIONSHIP_TYPE_CATEGORY: Record<
   employee: 'work',
   business_partner: 'work',
   client: 'work',
-  classmate: 'other',
+  classmate: 'education',
   mentor: 'other',
   mentee: 'other',
   roommate: 'other',
