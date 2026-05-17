@@ -12,6 +12,7 @@ import { CrudFeature } from "./features/crud";
 import { IntelligenceFeature } from "./features/intelligence";
 import { FilteringFeature } from "./features/filtering";
 import { TimelineFeature } from "./features/timeline";
+import { ChatFeature } from "./features/chat";
 import { AuthProvider } from "./auth/AuthContext";
 import { AuthGuard } from "./auth/AuthGuard";
 
@@ -51,6 +52,7 @@ function AuthenticatedApp() {
             <IntelligenceFeature />
             <FilteringFeature />
             <TimelineFeature />
+            <ChatFeature />
           </>
         }
       />
