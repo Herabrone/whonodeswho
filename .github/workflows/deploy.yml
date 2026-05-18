@@ -17,6 +17,6 @@ jobs:
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd /root/whonodeswho
-            chmod +x ./deploy.sh
-            ./deploy.sh /root/whonodeswho
+            cd ~/whonodeswho
+            chmod +x ./deploy ./ops/deploy.sh
+            ./deploy
