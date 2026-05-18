@@ -23,6 +23,11 @@ const RULE_TITLES: Record<string, string> = {
   "shared-grandparent-cousin": "Shared Grandparent -> Cousin",
   "grandparent-child-parent": "Grandparent's Child -> Parent",
   "shared-manager-coworker": "Shared Manager -> Coworker",
+  "mutual-friends-friend": "Two Shared Friends -> Friend",
+  "friend-of-friend-acquaintance": "Friend of a Friend -> Acquaintance",
+  "shared-work-connection-coworker": "Shared Work Contact -> Coworker",
+  "shared-romantic-history-complicated": "Shared Romantic History -> Complicated",
+  "shared-roommate-friend": "Shared Roommate -> Friend",
 };
 
 function outputTypeForFact(fact: Fact): string {
@@ -45,6 +50,12 @@ function outputTypeForFact(fact: Fact): string {
       return "manager";
     case "coworker":
       return "coworker";
+    case "friend":
+      return "friend";
+    case "acquaintance":
+      return "acquaintance";
+    case "complicated":
+      return "complicated";
     case "parentInLaw":
       return "parent-in-law";
     case "siblingInLaw":
@@ -97,6 +108,12 @@ export function proposalsFromFacts(
     const key = factKey(fact);
     if (baseKeys.has(key) || proposedKeys.has(key)) continue;
     if (fact.args[0] === fact.args[1]) continue;
+
+    // Universal duplicate check: skip if any relationship exists between the pair
+    if (baseFacts.some(existing =>
+      (existing.args[0] === fact.args[0] && existing.args[1] === fact.args[1]) ||
+      (existing.args[0] === fact.args[1] && existing.args[1] === fact.args[0])
+    )) continue;
 
     if (fact.predicate === "parent" && wouldExceedParentCardinality(baseFacts, fact.args[0], fact.args[1])) {
       issues.push(withheldParentIssue(fact, baseFacts));

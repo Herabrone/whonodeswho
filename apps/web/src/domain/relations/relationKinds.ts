@@ -30,6 +30,7 @@ export type CanonicalRelationKind =
   | "close friend"
   | "best friend"
   | "acquaintance"
+  | "housemate"
   | "roommate"
   | string;
 
@@ -44,6 +45,10 @@ export type FactPredicate =
   | "cousin"
   | "manages"
   | "coworker"
+  | "friend"
+  | "acquaintance"
+  | "roommate"
+  | "complicated"
   | "parentInLaw"
   | "siblingInLaw";
 
@@ -60,9 +65,11 @@ export const SYMMETRIC_RELATION_KINDS = new Set<string>([
   "close friend",
   "best friend",
   "acquaintance",
+  "housemate",
   "roommate",
   "rival",
   "enemy",
+  "complicated",
 ]);
 
 export const INVERSE_RELATION_KIND: Record<string, string> = {
@@ -117,6 +124,7 @@ export const TYPE_DEFAULTS: Record<
   "close friend": { category: "friend", direction: "two-way" },
   "best friend": { category: "friend", direction: "two-way" },
   acquaintance: { category: "friend", direction: "two-way" },
+  housemate: { category: "other", direction: "two-way" },
   classmate: { category: "education", direction: "two-way" },
   roommate: { category: "other", direction: "two-way" },
   rival: { category: "conflict", direction: "two-way" },
@@ -127,7 +135,7 @@ export const TYPE_DEFAULTS: Record<
   betrayed: { category: "conflict", direction: "one-way" },
   traitor: { category: "conflict", direction: "one-way" },
   "on bad terms": { category: "conflict", direction: "one-way" },
-  complicated: { category: "conflict", direction: "one-way" },
+  complicated: { category: "conflict", direction: "two-way" },
 };
 
 export function getTypeDefaults(

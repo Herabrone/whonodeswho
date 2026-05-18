@@ -5,7 +5,7 @@ import { uniqueFacts } from "./facts";
 
 export type RelationshipLike = Pick<
   Relationship,
-  "source" | "target" | "type" | "category" | "direction"
+  "source" | "target" | "type" | "category" | "direction" | "autoCreatedReciprocalOfId"
 > & { id?: string };
 
 export interface FactBase {

@@ -811,10 +811,46 @@ export function CrudFeature() {
         existing: relationshipDebugSnapshot(modal.relationship),
         payload,
       });
-      updateRelationship(modal.relationship.id, payload);
-      closeModal();
+
+      const inference = inferAutoRelationships(payload, relationships, people);
+      const fatalIssues = inference.issues.filter((issue) => issue.severity === "fatal");
+      if (fatalIssues.length > 0) {
+        setRelationshipError(fatalIssues.map((issue) => issue.message).join(" "));
+        return;
+      }
+
+      const proposals = inference.proposals.filter(
+        (proposal) => !declinedProposalKeys.has(proposalKey(proposal)),
+      );
+      const warnings = inference.issues
+        .filter((issue) => issue.severity === "warning")
+        .map((issue) => issue.message);
+
+      if (proposals.length === 0) {
+        updateRelationship(modal.relationship.id, payload);
+        closeModal();
+      } else {
+        const primaryProposal: ProposalItem = { ...payload };
+        setConfirmPrimary(primaryProposal);
+        setConfirmProposals(proposals.map((p) => ({ ...p })));
+        setConfirmWarnings(warnings);
+        setConfirmOpen(true);
+      }
     } else {
-      const inference = inferAutoRelationships(payload, relationships);
+      const sourcePerson = people.find((person) => person.id === payload.source);
+      const targetPerson = people.find((person) => person.id === payload.target);
+
+      logRelationshipDebug("submitRelationship:create", {
+        anchorPair: {
+          sourceId: payload.source,
+          sourceName: sourcePerson?.name ?? payload.source,
+          targetId: payload.target,
+          targetName: targetPerson?.name ?? payload.target,
+        },
+      });
+
+      // Inference must anchor to the exact IDs selected in the new relationship draft.
+      const inference = inferAutoRelationships(payload, relationships, people);
       const fatalIssues = inference.issues.filter((issue) => issue.severity === "fatal");
       if (fatalIssues.length > 0) {
         setRelationshipError(fatalIssues.map((issue) => issue.message).join(" "));
@@ -829,7 +865,7 @@ export function CrudFeature() {
         .filter((issue) => issue.severity === "warning")
         .map((issue) => issue.message);
 
-      if ((!proposals || proposals.length === 0) && warnings.length === 0) {
+      if (!proposals || proposals.length === 0) {
         addRelationship(payload);
         closeModal();
       } else {
@@ -858,7 +894,11 @@ export function CrudFeature() {
 
     rememberDeclinedProposals(declined);
     if (confirmPrimary) {
-      addRelationship(proposalToRelationshipInput(confirmPrimary));
+      if (modal.type === "relationship-edit") {
+        updateRelationship(modal.relationship.id, proposalToRelationshipInput(confirmPrimary));
+      } else {
+        addRelationship(proposalToRelationshipInput(confirmPrimary));
+      }
     }
     for (const p of selected) {
       addRelationship(proposalToRelationshipInput(p));
@@ -875,7 +915,11 @@ export function CrudFeature() {
     // which means "just add the primary relationship now". Proposals for future
     // relationships involving these people should still surface normally.
     if (confirmPrimary) {
-      addRelationship(proposalToRelationshipInput(confirmPrimary));
+      if (modal.type === "relationship-edit") {
+        updateRelationship(modal.relationship.id, proposalToRelationshipInput(confirmPrimary));
+      } else {
+        addRelationship(proposalToRelationshipInput(confirmPrimary));
+      }
     }
     setConfirmOpen(false);
     setConfirmPrimary(null);
@@ -883,7 +927,6 @@ export function CrudFeature() {
     setConfirmWarnings([]);
     setModal({ type: "none" });
   };
-
   const handleCancelConfirm = () => {
     // Keep the relationship composer open so the user can revise the primary relationship.
     setConfirmOpen(false);
@@ -1617,9 +1660,9 @@ export function CrudFeature() {
                 <div className="sm:col-span-2 rounded-lg border border-dashed border-rf-border bg-rf-subtle/60 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm font-medium text-rf-text">Add a second layer (optional)</div>
+                      <div className="text-sm font-medium text-rf-text">Status (optional)</div>
                       <div className="text-xs text-rf-muted">
-                        Use the primary type for the core relationship (e.g. Ex-Partner, Sibling) and the secondary type for how things currently stand (e.g. Friends, Estranged).
+                        Use this to indicate how things currently stand — whether they are on good, bad, or romantic terms.
                       </div>
                     </div>
                     <button
@@ -1630,27 +1673,28 @@ export function CrudFeature() {
                           setSecondaryLayerOpen(true);
                           return;
                         }
-
                         setSecondaryLayerOpen((open) => !open);
                       }}
                       className="rounded border border-rf-border bg-rf-surface px-2 py-1 text-xs text-rf-text hover:bg-rf-base"
                     >
                       {secondaryLayerOpen
-                        ? "Hide layer"
+                        ? "Hide status"
                         : secondaryLayerEnabled
-                          ? "Edit layer"
-                          : "+ Add layer"}
+                          ? "Edit status"
+                          : "+ Add status"}
                     </button>
                   </div>
 
                   {secondaryLayerEnabled && secondaryLayerOpen ? (
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <label className="text-sm text-rf-text">
-                        Secondary category
+                        Status category
                         <select
                           value={relationshipDraft.secondaryCategory}
                           onChange={(e) => {
-                            const secondaryCategory = e.target.value as RelationshipCategory;
+                            const allowed = ["friend", "romantic", "conflict"];
+                            let secondaryCategory = e.target.value as RelationshipCategory;
+                            if (!allowed.includes(secondaryCategory)) secondaryCategory = "friend";
                             const nextType = relationshipCatalog[secondaryCategory][0] ?? "";
                             setRelationshipDraft((d) => ({
                               ...d,
@@ -1661,11 +1705,9 @@ export function CrudFeature() {
                           }}
                           className="mt-1 w-full rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text"
                         >
-                          {CATEGORIES.map((category) => (
-                            <option key={category} value={category}>
-                              {categoryLabels[category]}
-                            </option>
-                          ))}
+                          <option value="friend">Friend</option>
+                          <option value="romantic">Romantic</option>
+                          <option value="conflict">Conflict</option>
                         </select>
                       </label>
 
@@ -1719,7 +1761,7 @@ export function CrudFeature() {
                           }}
                           className="rounded border border-rf-border bg-rf-surface px-2 py-1 text-xs text-rf-muted hover:bg-rf-base"
                         >
-                          Clear layer
+                          Clear status
                         </button>
                       </div>
                     </div>

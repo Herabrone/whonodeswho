@@ -1,9 +1,11 @@
 import { buildFactBase } from "./buildFactBase";
+import type { RelationshipLike } from "./buildFactBase";
 import type { Fact } from "./facts";
 import { factKey, sortFacts, uniqueFacts } from "./facts";
 import { applyFamilyRules } from "./familyRules";
 import { proposalsFromFacts } from "./proposalRules";
 import type { InferenceRequest, InferenceResult } from "./proposalTypes";
+import { applySocialRules } from "./socialRules";
 import { validateFactBase } from "./validationRules";
 import { applyWorkRules } from "./workRules";
 
@@ -12,11 +14,53 @@ function freshFacts(known: Fact[], derived: Fact[]): Fact[] {
   return uniqueFacts(derived).filter((fact) => !knownKeys.has(factKey(fact)));
 }
 
-function applyPositiveRules(known: Fact[], frontier: Fact[], depth: number): Fact[] {
+function applyPositiveRules(
+  known: Fact[],
+  frontier: Fact[],
+  depth: number,
+  existingRelationships: RelationshipLike[],
+  primary: InferenceRequest["primary"],
+): Fact[] {
   return sortFacts([
     ...applyFamilyRules(known, frontier, depth),
     ...applyWorkRules(known, frontier, depth),
+    ...applySocialRules(known, frontier, depth, existingRelationships, primary),
   ]);
+}
+
+function filterRelationshipsForInference(existingRelationships: RelationshipLike[]): RelationshipLike[] {
+  return existingRelationships.filter((relationship) => !relationship.autoCreatedReciprocalOfId);
+}
+
+function collectEligibleParticipantIds(
+  existingRelationships: RelationshipLike[],
+  primary: InferenceRequest["primary"],
+): Set<string> {
+  const eligibleParticipantIds = new Set([primary.source, primary.target]);
+
+  for (const relationship of existingRelationships) {
+    const touchesPrimary = relationship.source === primary.source ||
+      relationship.target === primary.source ||
+      relationship.source === primary.target ||
+      relationship.target === primary.target;
+
+    if (!touchesPrimary) continue;
+
+    eligibleParticipantIds.add(relationship.source);
+    eligibleParticipantIds.add(relationship.target);
+  }
+
+  return eligibleParticipantIds;
+}
+
+function scopeRelationshipsToEligibleParticipants(
+  existingRelationships: RelationshipLike[],
+  eligibleParticipantIds: Set<string>,
+): RelationshipLike[] {
+  return existingRelationships.filter(
+    (relationship) =>
+      eligibleParticipantIds.has(relationship.source) && eligibleParticipantIds.has(relationship.target),
+  );
 }
 
 export function runRelationshipInference({
@@ -25,17 +69,14 @@ export function runRelationshipInference({
   maxIterations = 2,
   people,
 }: InferenceRequest): InferenceResult {
-  // 1. Identify neighbors of A and B in existing relationships
-  const neighbors = new Set<string>();
-  for (const rel of existingRelationships) {
-    neighbors.add(rel.source);
-    neighbors.add(rel.target);
-  }
+  const inferenceRelationships = filterRelationshipsForInference(existingRelationships);
+  const eligibleParticipantIds = collectEligibleParticipantIds(inferenceRelationships, primary);
+  const scopedRelationships = scopeRelationshipsToEligibleParticipants(
+    inferenceRelationships,
+    eligibleParticipantIds,
+  );
 
-  // 2. Define the eligible pool: all people seen in existing relationships + A and B
-  const pool = new Set([...neighbors, primary.source, primary.target]);
-
-  const factBase = buildFactBase(existingRelationships, primary);
+  const factBase = buildFactBase(scopedRelationships, primary);
   const validationIssues = validateFactBase(factBase);
   const hasFatalIssue = validationIssues.some((issue) => issue.severity === "fatal");
   if (hasFatalIssue) {
@@ -45,13 +86,13 @@ export function runRelationshipInference({
   let known = factBase.facts;
   let frontier = factBase.facts;
   for (let depth = 1; depth <= maxIterations; depth++) {
-    const derived = applyPositiveRules(known, frontier, depth);
+    const derived = applyPositiveRules(known, frontier, depth, scopedRelationships, primary);
 
-    // 3. Filter derived facts: only keep facts where BOTH people are in the pool
-    // This allows the engine to USE all existing knowledge, but only PROPOSE 
-    // or CHAIN new facts that directly involve the eligible participants.
+    // Defensive guard: once the one-hop pool is fixed, no rule should be able to
+    // introduce participants outside that pool.
     const filteredDerived = derived.filter(
-      (fact) => pool.has(fact.args[0]) && pool.has(fact.args[1]),
+      (fact) =>
+        eligibleParticipantIds.has(fact.args[0]) && eligibleParticipantIds.has(fact.args[1]),
     );
 
     const fresh = freshFacts(known, filteredDerived);

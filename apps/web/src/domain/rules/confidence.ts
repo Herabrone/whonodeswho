@@ -22,6 +22,7 @@ function baseConfidence(fact: Fact): ProposalConfidence {
     case "spouse-sibling-in-law":
     case "grandparent-spouse":
     case "grandparent-child-parent":
+    case "shared-manager-coworker":
       return "High";
     case "shared-parent-sibling":
     case "shared-child-spouse":
@@ -30,9 +31,13 @@ function baseConfidence(fact: Fact): ProposalConfidence {
     case "parent-sibling-aunt-uncle":
     case "sibling-parents-cousin":
     case "shared-grandparent-cousin":
-    case "shared-manager-coworker":
+    case "mutual-friends-friend":
+    case "shared-work-connection-coworker":
+    case "shared-roommate-friend":
       return "Medium";
     case "half-sibling-shared-parent":
+    case "friend-of-friend-acquaintance":
+    case "shared-romantic-history-complicated":
       return "Low";
     default:
       return "Medium";

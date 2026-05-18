@@ -48,7 +48,11 @@ const RELATION_ALIASES: Record<string, CanonicalRelationKind> = {
   "close friend": "close friend",
   "best friend": "best friend",
   acquaintance: "acquaintance",
+  housemate: "roommate",
+  "house mate": "roommate",
   roommate: "roommate",
+  report: "employee",
+  "direct report": "employee",
 };
 
 export function canonicalizeRelationKind(raw: string): CanonicalRelationKind {

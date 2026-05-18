@@ -52,6 +52,14 @@ export function normalizeRelationship(
       return { predicate: "manages", args: [target, source], canonicalKind: kind };
     case "coworker":
       return { predicate: "coworker", args: sortedPair(source, target), canonicalKind: kind };
+    case "friend":
+    case "close friend":
+    case "best friend":
+      return { predicate: "friend", args: sortedPair(source, target), canonicalKind: kind };
+    case "acquaintance":
+      return { predicate: "acquaintance", args: sortedPair(source, target), canonicalKind: kind };
+    case "roommate":
+      return { predicate: "roommate", args: sortedPair(source, target), canonicalKind: kind };
     case "parent-in-law":
       return { predicate: "parentInLaw", args: [source, target], canonicalKind: kind };
     case "child-in-law":

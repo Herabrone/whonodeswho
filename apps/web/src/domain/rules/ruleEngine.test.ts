@@ -11,6 +11,7 @@ function relationship(
   type: string,
   category: Relationship["category"] = "family",
   direction: Relationship["direction"] = "one-way",
+  options: Partial<Pick<Relationship, "autoCreatedReciprocalOfId">> = {},
 ): Relationship {
   return {
     id: `r${++idCounter}`,
@@ -19,6 +20,7 @@ function relationship(
     type,
     category,
     direction,
+    ...options,
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
@@ -39,6 +41,35 @@ function proposalKey(proposal: ReturnType<typeof runRelationshipInference>["prop
 }
 
 describe("runRelationshipInference", () => {
+  it("does not derive proposals from unrelated graph branches when the new pair is isolated", () => {
+    const result = runRelationshipInference({
+      existingRelationships: [
+        relationship("ben", "darian", "sibling", "family", "two-way"),
+        relationship("ben", "jay", "parent"),
+        relationship("syl", "elisa", "sibling", "family", "two-way"),
+      ],
+      primary: draft("Ryan", "Oma", "friend", "friend", "two-way"),
+    });
+
+    expect(result.proposals).toHaveLength(0);
+  });
+
+  it("ignores auto-created reciprocals when scoping an otherwise isolated pair", () => {
+    const result = runRelationshipInference({
+      existingRelationships: [
+        relationship("Ryan", "ben", "child", "family", "one-way", { autoCreatedReciprocalOfId: "p-ben" }),
+        relationship("Ryan", "darian", "child", "family", "one-way", { autoCreatedReciprocalOfId: "p-darian" }),
+        relationship("Oma", "syl", "child", "family", "one-way", { autoCreatedReciprocalOfId: "p-syl" }),
+        relationship("Oma", "jay", "child", "family", "one-way", { autoCreatedReciprocalOfId: "p-jay" }),
+        relationship("ben", "darian", "sibling", "family", "two-way"),
+        relationship("syl", "jay", "sibling", "family", "two-way"),
+      ],
+      primary: draft("Ryan", "Oma", "friend", "friend", "two-way"),
+    });
+
+    expect(result.proposals).toHaveLength(0);
+  });
+
   it("derives aunt/uncle proposals from a sibling and child fact", () => {
     const result = runRelationshipInference({
       existingRelationships: [relationship("A", "C", "parent")],
@@ -55,7 +86,7 @@ describe("runRelationshipInference", () => {
     );
   });
 
-  it("derives cousin proposals at depth two when parent siblings are themselves derived", () => {
+  it("does not derive cousin proposals beyond one hop from the new relationship", () => {
     const result = runRelationshipInference({
       existingRelationships: [
         relationship("P", "A", "parent"),
@@ -73,9 +104,7 @@ describe("runRelationshipInference", () => {
         proposal.draft.type === "cousin",
     );
 
-    expect(cousin).toBeDefined();
-    expect(cousin?.derivationDepth).toBe(2);
-    expect(["Medium", "Low"]).toContain(cousin?.confidence);
+    expect(cousin).toBeUndefined();
   });
 
   it("suppresses a duplicate proposal when the duplicate fact is derived", () => {
@@ -140,7 +169,7 @@ describe("runRelationshipInference", () => {
     );
   });
 
-  it("uses a derived co-parent spouse fact to suggest parent-in-law relationships", () => {
+  it("does not suggest parent-in-law relationships for participants beyond one hop", () => {
     const result = runRelationshipInference({
       existingRelationships: [
         relationship("Grandmother", "Mother", "parent"),
@@ -149,12 +178,28 @@ describe("runRelationshipInference", () => {
       primary: draft("Father", "A", "parent"),
     });
 
+    expect(result.proposals.map(proposalKey)).not.toContain("Grandmother->Father:parent-in-law");
+  });
+
+  it("limits proposals to one-hop participants from the new relationship", () => {
+    const result = runRelationshipInference({
+      existingRelationships: [
+        relationship("Ryan", "Ben", "sibling", "family", "two-way"),
+        relationship("Ben", "Child", "parent"),
+        relationship("Syl", "Elisa", "sibling", "family", "two-way"),
+      ],
+      primary: draft("Ryan", "Oma", "spouse", "romantic", "two-way"),
+    });
+
     expect(result.proposals).toContainEqual(
       expect.objectContaining({
-        ruleId: "spouse-parent-in-law",
-        draft: expect.objectContaining({ source: "Grandmother", target: "Father", type: "parent-in-law" }),
+        ruleId: "spouse-sibling-in-law",
+        draft: expect.objectContaining({ source: "Ben", target: "Oma", type: "sibling-in-law" }),
       }),
     );
+    expect(result.proposals.map(proposalKey).every((proposal) => !proposal.includes("Child"))).toBe(true);
+    expect(result.proposals.map(proposalKey).every((proposal) => !proposal.includes("Syl"))).toBe(true);
+    expect(result.proposals.map(proposalKey).every((proposal) => !proposal.includes("Elisa"))).toBe(true);
   });
 
   it("surfaces half-sibling shared parents as low-confidence unchecked choices", () => {
@@ -188,7 +233,7 @@ describe("runRelationshipInference", () => {
     expect(result.proposals).toContainEqual(
       expect.objectContaining({
         ruleId: "shared-manager-coworker",
-        confidence: "Medium",
+        confidence: "High",
         draft: expect.objectContaining({ source: "Existing", target: "New", type: "coworker" }),
       }),
     );
@@ -212,6 +257,126 @@ describe("runRelationshipInference", () => {
         draft: expect.objectContaining({ source: "Mom", target: "B", type: "parent" }),
       }),
     );
+  });
+
+  it("proposes friend when two people share four strong friends", () => {
+    const result = runRelationshipInference({
+      existingRelationships: [
+        relationship("Ben", "Cam", "friend", "friend", "two-way"),
+        relationship("Ryan", "Dex", "best friend", "friend", "two-way"),
+        relationship("Ben", "Dex", "close friend", "friend", "two-way"),
+        relationship("Ryan", "Eli", "friend", "friend", "two-way"),
+        relationship("Ben", "Eli", "friend", "friend", "two-way"),
+        relationship("Ryan", "Fay", "friend", "friend", "two-way"),
+        relationship("Ben", "Fay", "friend", "friend", "two-way"),
+      ],
+      primary: draft("Ryan", "Cam", "friend", "friend", "two-way"),
+    });
+
+    expect(result.proposals).toContainEqual(
+      expect.objectContaining({
+        ruleId: "mutual-friends-friend",
+        confidence: "Medium",
+        prechecked: false,
+        draft: expect.objectContaining({ source: "Ryan", target: "Ben", type: "friend" }),
+      }),
+    );
+  });
+
+  it("does not propose acquaintance when two people share exactly one strong friend", () => {
+    const result = runRelationshipInference({
+      existingRelationships: [relationship("Ben", "Cam", "best friend", "friend", "two-way")],
+      primary: draft("Ryan", "Cam", "friend", "friend", "two-way"),
+    });
+
+    expect(result.proposals).not.toContainEqual(
+      expect.objectContaining({
+        ruleId: "friend-of-friend-acquaintance",
+      }),
+    );
+    expect(result.proposals).not.toContainEqual(
+      expect.objectContaining({
+        draft: expect.objectContaining({ source: "Ryan", target: "Ben", type: "acquaintance" }),
+      }),
+    );
+  });
+
+  it("proposes medium-confidence coworkers through a shared work contact", () => {
+    const result = runRelationshipInference({
+      existingRelationships: [relationship("Ben", "Cam", "coworker", "work", "two-way")],
+      primary: draft("Ryan", "Cam", "coworker", "work", "two-way"),
+    });
+
+    expect(result.proposals).toContainEqual(
+      expect.objectContaining({
+        ruleId: "shared-work-connection-coworker",
+        confidence: "Medium",
+        draft: expect.objectContaining({ source: "Ryan", target: "Ben", type: "coworker" }),
+      }),
+    );
+  });
+
+  it("proposes low-confidence complicated when two people share romantic history", () => {
+    const result = runRelationshipInference({
+      existingRelationships: [relationship("Ben", "Cam", "partner", "romantic", "two-way")],
+      primary: draft("Ryan", "Cam", "ex-partner", "romantic", "two-way"),
+    });
+
+    expect(result.proposals).toContainEqual(
+      expect.objectContaining({
+        ruleId: "shared-romantic-history-complicated",
+        confidence: "Low",
+        prechecked: false,
+        draft: expect.objectContaining({ source: "Ryan", target: "Ben", type: "complicated" }),
+      }),
+    );
+  });
+
+  it("proposes friend when two people share a roommate or housemate", () => {
+    const result = runRelationshipInference({
+      existingRelationships: [relationship("Ben", "Cam", "housemate", "other", "two-way")],
+      primary: draft("Ryan", "Cam", "roommate", "other", "two-way"),
+    });
+
+    expect(result.proposals).toContainEqual(
+      expect.objectContaining({
+        ruleId: "shared-roommate-friend",
+        confidence: "Medium",
+        draft: expect.objectContaining({ source: "Ryan", target: "Ben", type: "friend" }),
+      }),
+    );
+  });
+
+  it("renders social suggestion explanations with person names instead of raw ids", () => {
+    const result = runRelationshipInference({
+      existingRelationships: [
+        relationship("p-ben", "p-cam", "friend", "friend", "two-way"),
+        relationship("p-ryan", "p-dex", "friend", "friend", "two-way"),
+        relationship("p-ben", "p-dex", "friend", "friend", "two-way"),
+        relationship("p-ryan", "p-eli", "friend", "friend", "two-way"),
+        relationship("p-ben", "p-eli", "friend", "friend", "two-way"),
+        relationship("p-ryan", "p-fay", "friend", "friend", "two-way"),
+        relationship("p-ben", "p-fay", "friend", "friend", "two-way"),
+      ],
+      primary: draft("p-ryan", "p-cam", "friend", "friend", "two-way"),
+      people: [
+        { id: "p-ryan", name: "Ryan" },
+        { id: "p-ben", name: "Ben" },
+        { id: "p-cam", name: "Cam" },
+        { id: "p-dex", name: "Dex" },
+        { id: "p-eli", name: "Eli" },
+        { id: "p-fay", name: "Fay" },
+      ],
+    });
+
+    const proposal = result.proposals.find((item) => item.ruleId === "mutual-friends-friend");
+    expect(proposal?.explanation).toContain("Two Shared Friends -> Friend");
+    expect(proposal?.explanation).toContain("Ben -> Cam");
+    expect(proposal?.explanation).toContain("Cam -> Ryan");
+    expect(proposal?.explanation).toContain("Ben -> Dex");
+    expect(proposal?.explanation).toContain("Dex -> Ryan");
+    expect(proposal?.explanation).not.toContain("p-ryan");
+    expect(proposal?.explanation).not.toContain("p-ben");
   });
 });
 

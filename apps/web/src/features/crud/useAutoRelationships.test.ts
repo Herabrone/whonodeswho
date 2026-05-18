@@ -280,7 +280,7 @@ describe("manager rules", () => {
         source: "emp1",
         target: "emp2",
         type: "coworker",
-        confidence: "Medium",
+        confidence: "High",
         rule: "Shared Manager -> Coworker",
       }),
     );
@@ -305,14 +305,8 @@ describe("deterministic-only scope", () => {
     "parent-in-law",
     "child-in-law",
     "sibling-in-law",
-    "coworker",
     "mentor",
     "mentee",
-    "close friend",
-    "roommate",
-    "friend",
-    "best friend",
-    "acquaintance",
   ])("produces no suggestions for out-of-scope trigger %s", (type) => {
     expect(run(type, "A", "B", [r("A", "C", type, "other", "two-way")])).toHaveLength(0);
   });
