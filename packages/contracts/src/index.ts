@@ -156,6 +156,7 @@ export interface RelationshipHistoryPersistedState {
     layoutMode: LayoutMode;
     treeShape: TreeShape;
     treeRootId: string | null;
+    familyAwareLayered: boolean;
   };
 }
 
@@ -183,6 +184,7 @@ export interface PersistedState {
     layoutMode: LayoutMode;
     treeShape: TreeShape;
     treeRootId: string | null;
+    familyAwareLayered: boolean;
   };
 }
 

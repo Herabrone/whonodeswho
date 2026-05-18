@@ -1,0 +1,26 @@
+#!/bin/bash
+# Git post-receive hook - Deploy when code is merged to main
+# Install this as: .git/hooks/post-receive
+
+while read oldrev newrev refname; do
+  # Only run on main/master branch
+  if [[ "$refname" == "refs/heads/main" ]] || [[ "$refname" == "refs/heads/master" ]]; then
+    # Check if this is a push (not a merge commit in a working directory)
+    if git rev-parse --verify -q "$newrev"; then
+      echo "[git-hook] Detected push to $(basename $refname). Triggering deployment..."
+      
+      # Get the directory where this hook is located (the .git/hooks directory)
+      HOOK_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+      REPO_DIR="$(dirname "$(dirname "$HOOK_DIR")")"
+      DEPLOY_SCRIPT="$REPO_DIR/ops/deploy.sh"
+      
+      if [ -f "$DEPLOY_SCRIPT" ]; then
+        chmod +x "$DEPLOY_SCRIPT"
+        "$DEPLOY_SCRIPT" "$REPO_DIR"
+      else
+        echo "[git-hook] ERROR: Deploy script not found at $DEPLOY_SCRIPT"
+        exit 1
+      fi
+    fi
+  fi
+done

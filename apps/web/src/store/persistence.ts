@@ -39,5 +39,6 @@ export const EMPTY_STATE: PersistedState = {
     layoutMode: "free",
     treeShape: "grouped",
     treeRootId: null,
+    familyAwareLayered: true,
   },
 };

@@ -28,6 +28,8 @@ export interface RadialCategoryLabel {
   position: XYPosition;
 }
 
+export type TreeEdgeRole = "family-primary" | "family-secondary" | "bfs-primary" | "secondary";
+
 interface TreeHierarchyDatum {
   id: string;
   children: TreeHierarchyDatum[];

@@ -1,0 +1,38 @@
+services:
+  whonodeswho-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: whonodeswho-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL:-file:/data/whonodeswho.db}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-3.5-turbo}
+    volumes:
+      - whonodeswho-api-data:/data
+    networks:
+      - app
+
+  whonodeswho-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whonodeswho-web
+    restart: unless-stopped
+    depends_on:
+      - whonodeswho-api
+    networks:
+      - proxy
+      - app
+
+volumes:
+  whonodeswho-api-data:
+
+networks:
+  app:
+  proxy:
+    external: true

@@ -94,6 +94,7 @@ interface LayoutSlice {
   layoutMode: LayoutMode;
   treeShape: TreeShape;
   treeRootId: string | null;
+  familyAwareLayered: boolean;
 }
 
 interface TimelineSlice {
@@ -170,6 +171,7 @@ export interface GraphStore
   setLayoutMode: (mode: LayoutMode) => void;
   setTreeShape: (shape: TreeShape) => void;
   setTreeRoot: (personId: string | null) => void;
+  setFamilyAwareLayered: (enabled: boolean) => void;
 
   // -- timeline actions (Timeline feature) --
   openTimeline: () => void;
@@ -344,6 +346,7 @@ function buildPersistedState(state: GraphStore): PersistedState {
       layoutMode: state.layoutMode,
       treeShape: state.treeShape,
       treeRootId: state.treeRootId,
+      familyAwareLayered: state.familyAwareLayered,
     },
   };
 }
@@ -383,6 +386,7 @@ function setPersistedSlices(
     layoutMode: persisted.layout.layoutMode,
     treeShape: persisted.layout.treeShape,
     treeRootId: persisted.layout.treeRootId,
+    familyAwareLayered: persisted.layout.familyAwareLayered,
     selectedPersonId: null,
     selectedRelationshipId: null,
     focusPersonId: null,
@@ -470,6 +474,7 @@ const LAYOUT_DEFAULTS: LayoutSlice = {
   layoutMode: "free",
   treeShape: "grouped",
   treeRootId: null,
+  familyAwareLayered: true,
 };
 
 const getCurrentYear = () => new Date().getFullYear();
@@ -600,6 +605,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       treeShape: persisted.layout?.treeShape ?? LAYOUT_DEFAULTS.treeShape,
       treeRootId: persisted.layout?.treeRootId ?? LAYOUT_DEFAULTS.treeRootId,
       ...sanitizedHistory,
+      familyAwareLayered:
+        persisted.layout?.familyAwareLayered ?? LAYOUT_DEFAULTS.familyAwareLayered,
       _historyKey: historyKey,
       hydrated: true,
       _persistence: store,
@@ -865,6 +872,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
   setTreeRoot: (personId) => {
     set({ treeRootId: personId });
+    scheduleSave(get, set);
+  },
+  setFamilyAwareLayered: (enabled) => {
+    set({ familyAwareLayered: enabled });
     scheduleSave(get, set);
   },
 
