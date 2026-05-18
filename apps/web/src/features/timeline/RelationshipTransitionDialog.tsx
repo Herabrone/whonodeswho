@@ -1,14 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import type { EpisodeKind, RelationshipEpisode } from "../../types";
+import type {
+  EpisodeKind,
+  RelationshipCategory,
+  RelationshipEpisode,
+} from "../../types";
 import type { TransitionOption, TransitionOutcome } from "../../domain/timeline/transitionTypes";
 import { getAvailableTransitions, ALL_EPISODE_KINDS } from "../../domain/timeline/transitionEngine";
-import { EPISODE_KIND_LABELS } from "../../domain/timeline/timelineTypes";
+import { CATEGORY_LABELS } from "../../constants";
+import { EPISODE_KIND_LABELS, episodeCategory } from "../../domain/timeline/timelineTypes";
 import { useGraphStore } from "../../store/useGraphStore";
 import { TransitionOptionCard, KindButton } from "./TransitionOptionCard";
 import { TransitionDatePicker, type DatePrecision } from "./TransitionDatePicker";
 import { TransitionPreview } from "./TransitionPreview";
 
 type Step = "option" | "friend_level" | "date" | "notes";
+
+const MORE_OPTION_CATEGORY_ORDER: RelationshipCategory[] = [
+  "romantic",
+  "conflict",
+  "friend",
+  "family",
+  "work",
+  "education",
+  "other",
+];
 
 interface RelationshipTransitionDialogProps {
   threadId: string;
@@ -543,6 +558,11 @@ function StepOption({
   error: string | null;
   onNext: () => void;
 }) {
+  const groupedMoreOptions = MORE_OPTION_CATEGORY_ORDER.map((category) => ({
+    category,
+    kinds: ALL_EPISODE_KINDS.filter((kind) => episodeCategory(kind) === category),
+  })).filter((group) => group.kinds.length > 0);
+
   return (
     <div>
       <p style={{ fontSize: 13, color: "var(--rf-text-secondary, var(--rf-muted))", marginBottom: 14, marginTop: 0 }}>
@@ -581,21 +601,38 @@ function StepOption({
       </button>
 
       {showMoreOptions && (
-        <div
-          style={{
-            marginTop: 10,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 6,
-          }}
-        >
-          {ALL_EPISODE_KINDS.map((kind) => (
-            <KindButton
-              key={kind}
-              kind={kind}
-              selected={customStartsKind === kind}
-              onSelect={onSelectCustomKind}
-            />
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+          {groupedMoreOptions.map((group) => (
+            <div key={group.category}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "var(--rf-text-secondary, var(--rf-muted))",
+                  marginBottom: 6,
+                }}
+              >
+                {CATEGORY_LABELS[group.category]}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6,
+                }}
+              >
+                {group.kinds.map((kind) => (
+                  <KindButton
+                    key={kind}
+                    kind={kind}
+                    selected={customStartsKind === kind}
+                    onSelect={onSelectCustomKind}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}

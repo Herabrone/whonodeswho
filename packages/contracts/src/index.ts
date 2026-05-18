@@ -8,23 +8,21 @@ export type RelationshipCategory =
   | "family"
   | "friend"
   | "romantic"
+  | "conflict"
   | "work"
   | "education"
   | "other";
 
 export type RelationshipDirection = "one-way" | "two-way";
 
-export type RelationshipPhaseSource = "user" | "legacy" | "inferred";
-
 export interface RelationshipPhase {
-  id: string;
   type: string;
   category: RelationshipCategory;
-  label: string;
-  startYear: number;
-  endYear?: number;
-  notes?: string;
-  source?: RelationshipPhaseSource;
+  fromYear: number;
+  fromMonth?: number;
+  toYear?: number;
+  toMonth?: number;
+  isCurrent: boolean;
 }
 
 export interface Person {
@@ -43,6 +41,8 @@ export interface Relationship {
   target: string;
   type: string;
   category: RelationshipCategory;
+  secondaryType?: string;
+  secondaryCategory?: RelationshipCategory;
   direction: RelationshipDirection;
   startYear?: number;
   startMonth?: number;
@@ -65,6 +65,15 @@ export type EpisodeKind =
   | "romantic_partner"
   | "spouse"
   | "ex_partner"
+  | "estranged"
+  | "no_contact"
+  | "rival"
+  | "enemy"
+  | "frenemy"
+  | "betrayed"
+  | "traitor"
+  | "on_bad_terms"
+  | "complicated"
   | "family"
   | "classmate"
   | "roommate"

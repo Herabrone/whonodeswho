@@ -106,9 +106,10 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
     },
     {
       id: "coworker_ended",
-      label: "No longer work together",
-      description: "One of you left or moved teams.",
+      label: "No longer work together — no contact",
+      description: "Work relationship ended and contact was severed.",
       endsKind: "coworker",
+      startsKind: "no_contact",
     },
     {
       id: "coworker_ended_friends",
@@ -138,14 +139,16 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
     {
       id: "friend_drifted",
       label: "Drifted apart",
-      description: "Lost touch; no active relationship.",
+      description: "Lost touch and became estranged.",
       endsKind: "friend",
+      startsKind: "estranged",
     },
     {
       id: "friend_fell_out",
       label: "Fell out",
-      description: "The friendship ended on bad terms.",
+      description: "The friendship shifted to ongoing bad terms.",
       endsKind: "friend",
+      startsKind: "on_bad_terms",
     },
   ],
 
@@ -160,8 +163,9 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
     {
       id: "close_drifted",
       label: "Drifted apart",
-      description: "The closeness faded.",
+      description: "The closeness faded into estrangement.",
       endsKind: "close_friend",
+      startsKind: "estranged",
     },
   ],
 
@@ -175,9 +179,10 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
     },
     {
       id: "manager_ended",
-      label: "No longer work together",
-      description: "One of you left the organisation.",
+      label: "No longer work together — no contact",
+      description: "The work relationship ended and contact was severed.",
       endsKind: "manager",
+      startsKind: "no_contact",
     },
   ],
 
@@ -191,9 +196,10 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
     },
     {
       id: "employee_ended",
-      label: "No longer work together",
-      description: "One of you left the organisation.",
+      label: "No longer work together — no contact",
+      description: "The work relationship ended and contact was severed.",
       endsKind: "employee",
+      startsKind: "no_contact",
     },
   ],
 
@@ -209,9 +215,10 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
     },
     {
       id: "classmate_ended",
-      label: "Lost touch",
-      description: "No longer in contact.",
+      label: "Lost touch — no contact",
+      description: "School connection ended and contact stopped.",
       endsKind: "classmate",
+      startsKind: "no_contact",
     },
   ],
 
@@ -225,9 +232,10 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
     },
     {
       id: "roommate_ended",
-      label: "Lost touch",
-      description: "No ongoing relationship after living together.",
+      label: "Lost touch — no contact",
+      description: "After living together, contact stopped.",
       endsKind: "roommate",
+      startsKind: "no_contact",
     },
   ],
 

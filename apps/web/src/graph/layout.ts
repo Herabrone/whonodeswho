@@ -6,6 +6,7 @@ import type { GraphData, Relationship, RelationshipCategory, TreeShape, XYPositi
 export const CATEGORY_ORDER: RelationshipCategory[] = [
   "family",
   "romantic",
+  "conflict",
   "friend",
   "work",
   "education",

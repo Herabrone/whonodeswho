@@ -47,6 +47,21 @@ export interface GraphView {
   groupedDivider: { x: number; yTop: number; yBottom: number } | null;
 }
 
+function capitalizeLabel(value: string | undefined): string {
+  return !value || value.length === 0
+    ? value ?? ""
+    : value
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+}
+
+function buildEdgeLabel(primaryType: string, secondaryType?: string): string {
+  return secondaryType
+    ? `${capitalizeLabel(primaryType)}\n${capitalizeLabel(secondaryType)}`
+    : capitalizeLabel(primaryType);
+}
+
 export function useGraphView(): GraphView {
   const people = useGraphStore((s) => s.people);
   const relationships = useGraphStore((s) => s.relationships);
@@ -108,14 +123,6 @@ export function useGraphView(): GraphView {
     const treeActive =
       layoutMode === "tree" && treeRootId !== null && people.some((p) => p.id === treeRootId);
     const groupedTreeActive = treeActive && treeShape === "grouped";
-
-    const capitalizeLabel = (s: string | undefined) =>
-      !s || s.length === 0
-        ? s ?? s
-        : s
-            .split(" ")
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ");
 
     if (groupedTreeActive && treeRootId) {
       const layout = computeCategoryTree(viewGraph, treeRootId);
@@ -237,6 +244,7 @@ export function useGraphView(): GraphView {
 
           const color = timelineState?.displayColor ?? relationshipColors[edge.category] ?? CATEGORY_COLORS[edge.category];
           const endedLike = timelineState?.visibility === "ended" || timelineState?.visibility === "dormant";
+          const isConflict = edge.category === "conflict";
           const style = endedLike
             ? {
                 stroke: graphTokens.edge.endedColor,
@@ -250,6 +258,7 @@ export function useGraphView(): GraphView {
                   ? graphTokens.edge.widthSelected
                   : graphTokens.edge.width,
                 opacity: 1,
+                ...(isConflict ? { strokeDasharray: "7 4" } : {}),
               };
 
           return [{
@@ -259,12 +268,24 @@ export function useGraphView(): GraphView {
             sourceHandle: "cat-b",
             targetHandle: "t",
             type: "relationship",
-            label: capitalizeLabel(edge.relationshipType),
+            label: buildEdgeLabel(
+              relationship.type,
+              relationship.secondaryType,
+            ),
             data: {
               layoutMode,
               treeShape,
               timelineState,
               relationshipIds: timelineView?.relationshipIds ?? [edge.id],
+              primaryLabel: capitalizeLabel(relationship.type),
+              primaryLabelColor: color,
+              secondaryLabel: relationship.secondaryType
+                ? capitalizeLabel(relationship.secondaryType)
+                : undefined,
+              secondaryLabelColor:
+                relationship.secondaryCategory
+                  ? relationshipColors[relationship.secondaryCategory]
+                  : undefined,
             },
             style,
             interactionWidth: 24,
@@ -316,8 +337,13 @@ export function useGraphView(): GraphView {
           const [padX = 4, padY = 2] = (edge as any).labelBgPadding ?? [4, 2];
           const charWidth = Math.max(6, fontSize * 0.6);
           const text = String(edge.label);
-          const width = Math.max(24, text.length * charWidth) + padX * 2;
-          const height = fontSize + padY * 2;
+          const lines = text.split("\n");
+          const longestLine = lines.reduce(
+            (max, line) => Math.max(max, line.length),
+            0,
+          );
+          const width = Math.max(24, longestLine * charWidth) + padX * 2;
+          const height = lines.length * fontSize + (lines.length - 1) * 6 + padY * 2;
           candidates.push({ edgeIndex: i, edge, baseX, baseY, width, height });
         });
 
@@ -407,13 +433,6 @@ export function useGraphView(): GraphView {
 
     const query = searchQuery.trim().toLowerCase();
     const visible = new Set(visibleCategories);
-    const capitalizeLabelGlobal = (s: string | undefined) =>
-      !s || s.length === 0
-        ? s ?? s
-        : s
-            .split(" ")
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ");
     const edges: Edge[] = viewGraph.relationships
       .filter((r) => visible.has(r.category))
       .filter((r) => !(hideWeak && WEAK_RELATIONSHIP_TYPES.has(r.type)))
@@ -434,6 +453,7 @@ export function useGraphView(): GraphView {
         const timelineView = timelineViewById.get(r.id);
         const timelineState = timelineView?.state;
         const endedLike = timelineState?.visibility === "ended" || timelineState?.visibility === "dormant";
+        const isConflict = r.category === "conflict";
 
         const edgeStyle = endedLike
           ? {
@@ -448,6 +468,7 @@ export function useGraphView(): GraphView {
                 ? Math.max(strokeWidth, graphTokens.edge.widthSelected)
                 : strokeWidth,
               opacity,
+              ...(isConflict ? { strokeDasharray: "7 4" } : {}),
             };
 
         return [{
@@ -455,7 +476,7 @@ export function useGraphView(): GraphView {
           source: r.source,
           target: r.target,
           type: "relationship",
-          label: showLabels ? capitalizeLabelGlobal(r.type) : undefined,
+          label: showLabels ? buildEdgeLabel(r.type, r.secondaryType) : undefined,
           selected: timelineView
             ? timelineView.relationshipIds.includes(selectedRelationshipId ?? "")
             : selectedRelationshipId === r.id,
@@ -465,6 +486,15 @@ export function useGraphView(): GraphView {
             secondary,
             timelineState,
             relationshipIds: timelineView?.relationshipIds ?? [r.id],
+            primaryLabel: capitalizeLabel(r.type),
+            primaryLabelColor: timelineState?.displayColor ?? color,
+            secondaryLabel: r.secondaryType
+              ? capitalizeLabel(r.secondaryType)
+              : undefined,
+            secondaryLabelColor:
+              r.secondaryCategory
+                ? relationshipColors[r.secondaryCategory]
+                : undefined,
           },
           markerEnd:
             r.direction === "one-way"
@@ -558,8 +588,13 @@ export function useGraphView(): GraphView {
         const [padX = 4, padY = 2] = (edge as any).labelBgPadding ?? [4, 2];
         const charWidth = Math.max(6, fontSize * 0.6);
         const text = String(edge.label);
-        const width = Math.max(24, text.length * charWidth) + padX * 2;
-        const height = fontSize + padY * 2;
+        const lines = text.split("\n");
+        const longestLine = lines.reduce(
+          (max, line) => Math.max(max, line.length),
+          0,
+        );
+        const width = Math.max(24, longestLine * charWidth) + padX * 2;
+        const height = lines.length * fontSize + (lines.length - 1) * 6 + padY * 2;
         candidates.push({ edgeIndex: i, edge, baseX, baseY, width, height });
       });
 

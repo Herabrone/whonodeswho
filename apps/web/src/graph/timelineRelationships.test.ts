@@ -4,14 +4,13 @@ import { buildTimelineRelationshipViews } from "./timelineRelationships";
 
 function phase(overrides: Partial<RelationshipPhase>): RelationshipPhase {
   return {
-    id: overrides.id ?? "phase-1",
     type: overrides.type ?? "friend",
     category: overrides.category ?? "friend",
-    label: overrides.label ?? "Friend",
-    startYear: overrides.startYear ?? 2017,
-    ...(overrides.endYear !== undefined ? { endYear: overrides.endYear } : {}),
-    ...(overrides.notes ? { notes: overrides.notes } : {}),
-    ...(overrides.source ? { source: overrides.source } : {}),
+    fromYear: overrides.fromYear ?? 2017,
+    ...(overrides.fromMonth !== undefined ? { fromMonth: overrides.fromMonth } : {}),
+    ...(overrides.toYear !== undefined ? { toYear: overrides.toYear } : {}),
+    ...(overrides.toMonth !== undefined ? { toMonth: overrides.toMonth } : {}),
+    isCurrent: overrides.isCurrent ?? false,
   };
 }
 
@@ -155,19 +154,16 @@ describe("buildTimelineRelationshipViews", () => {
           startYear: 1999,
           phases: [
             phase({
-              id: "phase-work",
               type: "coworker",
               category: "work",
-              label: "Coworker",
-              startYear: 2016,
-              endYear: 2018,
+              fromYear: 2016,
+              toYear: 2018,
             }),
             phase({
-              id: "phase-friend",
               type: "friend",
               category: "friend",
-              label: "Friend",
-              startYear: 2017,
+              fromYear: 2017,
+              isCurrent: true,
             }),
           ],
         }),

@@ -109,6 +109,14 @@ export const categoryTokens: Record<RelationshipCategory, CategoryToken> = {
   family: primitives.blue,
   friend: primitives.green,
   romantic: primitives.pink,
+  conflict: {
+    ui: "#991B1B",
+    gfx: "#B91C1C",
+    text: "#7F1D1D",
+    subtle: "#FEE2E2",
+    dmSubtle: "rgba(185,28,28,0.18)",
+    glow: "rgba(185,28,28,0.5)",
+  },
   work: primitives.amber,
   education: primitives.cyan,
   other: primitives.stone,
@@ -437,6 +445,9 @@ export function buildCssVars(): string {
     --rf-cat-romantic-ui: ${categoryTokens.romantic.ui};
     --rf-cat-romantic-gfx: ${categoryTokens.romantic.gfx};
     --rf-cat-romantic-subtle: ${categoryTokens.romantic.subtle};
+    --rf-cat-conflict-ui: ${categoryTokens.conflict.ui};
+    --rf-cat-conflict-gfx: ${categoryTokens.conflict.gfx};
+    --rf-cat-conflict-subtle: ${categoryTokens.conflict.subtle};
     --rf-cat-work-ui: ${categoryTokens.work.ui};
     --rf-cat-work-gfx: ${categoryTokens.work.gfx};
     --rf-cat-work-subtle: ${categoryTokens.work.subtle};

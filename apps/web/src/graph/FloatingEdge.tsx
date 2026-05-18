@@ -19,6 +19,10 @@ interface RelationshipEdgeData {
   labelRank?: number;
   labelCount?: number;
   labelShiftPx?: number;
+  primaryLabel?: string;
+  primaryLabelColor?: string;
+  secondaryLabel?: string;
+  secondaryLabelColor?: string;
 }
 
 interface NodeGeometry {
@@ -144,6 +148,7 @@ function FloatingEdgeComponent(props: EdgeProps) {
   const bgFill = labelBgStyle?.fill ?? "#ffffff";
   const bgOpacity = labelBgStyle?.opacity ?? 0.9;
   const borderRadius = labelBgBorderRadius ?? 4;
+  const hasSecondaryLabel = Boolean(edgeData?.primaryLabel && edgeData?.secondaryLabel);
 
   return (
     <>
@@ -156,20 +161,65 @@ function FloatingEdgeComponent(props: EdgeProps) {
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             }}
           >
-            <span
-              style={{
-                display: "inline-block",
-                padding: `${paddingY}px ${paddingX}px`,
-                borderRadius,
-                background: bgFill,
-                opacity: bgOpacity,
-                color: labelStyle?.fill ?? "#1a1d24",
-                fontSize: labelStyle?.fontSize ?? 11,
-                fontWeight: labelStyle?.fontWeight ?? 500,
-              }}
-            >
-              {label}
-            </span>
+            {hasSecondaryLabel ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                  gap: 4,
+                  minWidth: 84,
+                  padding: `${paddingY + 1}px ${paddingX + 1}px`,
+                  borderRadius,
+                  background: bgFill,
+                  opacity: bgOpacity,
+                  textAlign: "center",
+                }}
+              >
+                <span
+                  style={{
+                    color: edgeData?.primaryLabelColor ?? labelStyle?.fill ?? "#1a1d24",
+                    fontSize: labelStyle?.fontSize ?? 11,
+                    fontWeight: 600,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {edgeData?.primaryLabel}
+                </span>
+                <span
+                  style={{
+                    display: "block",
+                    height: 1,
+                    background: "var(--rf-border-default, rgba(28,25,23,0.16))",
+                  }}
+                />
+                <span
+                  style={{
+                    color: edgeData?.secondaryLabelColor ?? labelStyle?.fill ?? "#1a1d24",
+                    fontSize: Math.max(10, Number(labelStyle?.fontSize ?? 11) - 1),
+                    fontWeight: 500,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {edgeData?.secondaryLabel}
+                </span>
+              </div>
+            ) : (
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: `${paddingY}px ${paddingX}px`,
+                  borderRadius,
+                  background: bgFill,
+                  opacity: bgOpacity,
+                  color: labelStyle?.fill ?? "#1a1d24",
+                  fontSize: labelStyle?.fontSize ?? 11,
+                  fontWeight: labelStyle?.fontWeight ?? 500,
+                }}
+              >
+                {label}
+              </span>
+            )}
           </div>
         </EdgeLabelRenderer>
       ) : null}

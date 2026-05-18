@@ -2,7 +2,6 @@ import type {
   Relationship,
   RelationshipCategory,
   RelationshipPhase,
-  RelationshipPhaseSource,
 } from "../../types";
 
 export interface DerivedRelationshipThread {
@@ -23,8 +22,11 @@ export interface DerivedRelationshipEpisode {
   label: string;
   startYear: number;
   endYear?: number;
+  startMonth?: number;
+  endMonth?: number;
+  isCurrent?: boolean;
   notes?: string;
-  source?: RelationshipPhaseSource;
+  source?: "user" | "legacy";
 }
 
 export interface TimelineEpisodeMarker {
@@ -79,17 +81,20 @@ export function relationshipToLegacyEpisode(
 export function relationshipPhaseToEpisode(
   relationship: Relationship,
   phase: RelationshipPhase,
+  phaseIndex: number,
 ): DerivedRelationshipEpisode {
   return {
-    id: phase.id,
+    id: `${relationship.id}:phase:${phaseIndex}`,
     relationshipId: relationship.id,
     threadId: getThreadKey(relationship.source, relationship.target),
     type: phase.type,
     category: phase.category,
-    label: phase.label.trim() || phase.type,
-    startYear: phase.startYear,
-    ...(phase.endYear !== undefined ? { endYear: phase.endYear } : {}),
-    ...(phase.notes ? { notes: phase.notes } : {}),
-    ...(phase.source ? { source: phase.source } : {}),
+    label: phase.type,
+    startYear: phase.fromYear,
+    ...(phase.fromMonth !== undefined ? { startMonth: phase.fromMonth } : {}),
+    ...(!phase.isCurrent && phase.toYear !== undefined ? { endYear: phase.toYear } : {}),
+    ...(!phase.isCurrent && phase.toMonth !== undefined ? { endMonth: phase.toMonth } : {}),
+    ...(phase.isCurrent ? { isCurrent: true } : {}),
+    source: "user",
   };
 }

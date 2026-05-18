@@ -228,6 +228,40 @@ function episodeKindToLegacyRelationshipType(kind: EpisodeKind): string {
   }
 }
 
+function episodeKindToLegacyRelationshipCategory(kind: EpisodeKind): RelationshipCategory {
+  switch (kind) {
+    case "coworker":
+    case "manager":
+    case "employee":
+      return "work";
+    case "friend":
+    case "close_friend":
+      return "friend";
+    case "romantic_partner":
+    case "spouse":
+    case "ex_partner":
+      return "romantic";
+    case "classmate":
+      return "education";
+    case "estranged":
+    case "no_contact":
+    case "rival":
+    case "enemy":
+    case "frenemy":
+    case "betrayed":
+    case "traitor":
+    case "on_bad_terms":
+    case "complicated":
+      return "conflict";
+    case "family":
+      return "family";
+    case "roommate":
+    case "custom":
+    default:
+      return "other";
+  }
+}
+
 function relationshipDebugSnapshot(relationship: Relationship | undefined | null) {
   if (!relationship) return null;
 
@@ -994,7 +1028,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         isActive: Boolean(newEpisodeRecord),
         ...(hasValidTransitionYear ? { endYear: transitionYear } : {}),
         ...(newEpisodeRecord
-          ? { type: episodeKindToLegacyRelationshipType(newEpisodeRecord.kind) }
+          ? {
+              type: episodeKindToLegacyRelationshipType(newEpisodeRecord.kind),
+              category: episodeKindToLegacyRelationshipCategory(
+                newEpisodeRecord.kind,
+              ),
+            }
           : {}),
       };
 

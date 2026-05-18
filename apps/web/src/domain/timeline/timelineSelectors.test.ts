@@ -9,12 +9,13 @@ import {
 
 function phase(overrides: Partial<RelationshipPhase>): RelationshipPhase {
   return {
-    id: overrides.id ?? "phase-1",
     type: overrides.type ?? "friend",
     category: overrides.category ?? "friend",
-    label: overrides.label ?? "Friend",
-    startYear: overrides.startYear ?? 2017,
-    ...(overrides.endYear !== undefined ? { endYear: overrides.endYear } : {}),
+    fromYear: overrides.fromYear ?? 2017,
+    ...(overrides.fromMonth !== undefined ? { fromMonth: overrides.fromMonth } : {}),
+    ...(overrides.toYear !== undefined ? { toYear: overrides.toYear } : {}),
+    ...(overrides.toMonth !== undefined ? { toMonth: overrides.toMonth } : {}),
+    isCurrent: overrides.isCurrent ?? false,
   };
 }
 
@@ -52,14 +53,14 @@ describe("timeline selectors", () => {
         type: "friend",
         category: "friend",
         startYear: 1990,
-        phases: [phase({ id: "phase-work", type: "coworker", category: "work", label: "Coworker", startYear: 2016, endYear: 2018 })],
+        phases: [phase({ type: "coworker", category: "work", fromYear: 2016, toYear: 2018 })],
       }),
     ]));
 
     expect(markers).toHaveLength(1);
     expect(markers[0]).toMatchObject({
-      id: "phase-work",
-      label: "Coworker",
+      id: "r1:phase:0",
+      label: "coworker",
       category: "work",
       startYear: 2016,
       endYear: 2018,
@@ -70,7 +71,7 @@ describe("timeline selectors", () => {
     const range = selectTimelineRange(graph([
       relationship({
         id: "r1",
-        phases: [phase({ id: "phase-work", type: "coworker", category: "work", label: "Coworker", startYear: 2016, endYear: 2018 })],
+        phases: [phase({ type: "coworker", category: "work", fromYear: 2016, toYear: 2018 })],
       }),
       relationship({ id: "r2", source: "p1", target: "p2", type: "friend", category: "friend", startYear: 2020 }),
     ]));

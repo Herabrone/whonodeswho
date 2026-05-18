@@ -384,7 +384,11 @@ export function GraphCanvas() {
   const [cursorMode, setCursorMode] = useState<"pan" | "select">("pan");
   const setPosition = useGraphStore((s) => s.setPosition);
   const selectPerson = useGraphStore((s) => s.selectPerson);
+  const selectedPersonId = useGraphStore((s) => s.selectedPersonId);
   const selectRelationship = useGraphStore((s) => s.selectRelationship);
+  const selectedRelationshipId = useGraphStore((s) => s.selectedRelationshipId);
+  const deletePerson = useGraphStore((s) => s.deletePerson);
+  const deleteRelationship = useGraphStore((s) => s.deleteRelationship);
   const clearSelection = useGraphStore((s) => s.clearSelection);
   const setFocus = useGraphStore((s) => s.setFocus);
   const layoutMode = useGraphStore((s) => s.layoutMode);
@@ -525,6 +529,75 @@ export function GraphCanvas() {
     });
     return () => cancelAnimationFrame(frame);
   }, [layoutMode, treeShape, treeRootId, nodes.length, edges.length, fitView]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Delete") return;
+
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      const selectedPersonNodes = getNodes().filter(
+        (node) => node.selected && node.type === "person",
+      );
+
+      if (selectedPersonNodes.length > 1) {
+        event.preventDefault();
+        const shouldDelete = window.confirm(
+          `Delete ${selectedPersonNodes.length} people and all connected relationships?`,
+        );
+        if (!shouldDelete) return;
+
+        for (const node of selectedPersonNodes) {
+          deletePerson(node.id);
+        }
+        clearSelection();
+        return;
+      }
+
+      const selectedPersonNodeId = selectedPersonNodes[0]?.id ?? selectedPersonId;
+      if (selectedPersonNodeId) {
+        event.preventDefault();
+        const shouldDelete = window.confirm(
+          "Delete this person and all connected relationships?",
+        );
+        if (!shouldDelete) return;
+
+        deletePerson(selectedPersonNodeId);
+        clearSelection();
+        return;
+      }
+
+      if (selectedRelationshipId) {
+        event.preventDefault();
+        const shouldDelete = window.confirm("Delete this relationship?");
+        if (!shouldDelete) return;
+
+        deleteRelationship(selectedRelationshipId);
+        clearSelection();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    clearSelection,
+    deletePerson,
+    deleteRelationship,
+    getNodes,
+    selectedPersonId,
+    selectedRelationshipId,
+  ]);
 
   return (
     <ReactFlow

@@ -66,7 +66,7 @@ export function deriveThreadsAndEpisodes(
     }
 
     const relationshipEpisodes = relationship.phases?.length
-      ? relationship.phases.map((phase) => relationshipPhaseToEpisode(relationship, phase))
+      ? relationship.phases.map((phase, index) => relationshipPhaseToEpisode(relationship, phase, index))
       : [relationshipToLegacyEpisode(relationship)];
 
     episodes.push(...relationshipEpisodes);

@@ -317,6 +317,7 @@ export class GraphService {
       value === 'family' ||
       value === 'friend' ||
       value === 'romantic' ||
+      value === 'conflict' ||
       value === 'work' ||
       value === 'education' ||
       value === 'other'

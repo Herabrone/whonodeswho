@@ -61,6 +61,8 @@ export const SYMMETRIC_RELATION_KINDS = new Set<string>([
   "best friend",
   "acquaintance",
   "roommate",
+  "rival",
+  "enemy",
 ]);
 
 export const INVERSE_RELATION_KIND: Record<string, string> = {
@@ -117,6 +119,15 @@ export const TYPE_DEFAULTS: Record<
   acquaintance: { category: "friend", direction: "two-way" },
   classmate: { category: "education", direction: "two-way" },
   roommate: { category: "other", direction: "two-way" },
+  rival: { category: "conflict", direction: "two-way" },
+  enemy: { category: "conflict", direction: "two-way" },
+  estranged: { category: "conflict", direction: "one-way" },
+  "no contact": { category: "conflict", direction: "one-way" },
+  frenemy: { category: "conflict", direction: "one-way" },
+  betrayed: { category: "conflict", direction: "one-way" },
+  traitor: { category: "conflict", direction: "one-way" },
+  "on bad terms": { category: "conflict", direction: "one-way" },
+  complicated: { category: "conflict", direction: "one-way" },
 };
 
 export function getTypeDefaults(

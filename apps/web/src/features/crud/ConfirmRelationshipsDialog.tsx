@@ -3,6 +3,7 @@ import type {
   Person,
   RelationshipCategory,
   RelationshipDirection,
+  RelationshipPhase,
 } from "../../types";
 import type { ProposalConfidence } from "./useAutoRelationships";
 import { CATEGORIES } from "../../constants";
@@ -12,11 +13,14 @@ export interface ProposalItem {
   target: string;
   category: RelationshipCategory;
   type: string;
+  secondaryType?: string;
+  secondaryCategory?: RelationshipCategory;
   direction: RelationshipDirection;
   startYear?: number;
   startMonth?: number;
   endYear?: number;
   isActive?: boolean;
+  phases?: RelationshipPhase[];
   color?: string;
   notes?: string;
   rule?: string;

@@ -36,6 +36,24 @@ export function legacyTypeToEpisodeKind(type: string): EpisodeKind {
     case "ex_partner":
     case "ex_spouse":
       return "ex_partner";
+    case "estranged":
+      return "estranged";
+    case "no_contact":
+      return "no_contact";
+    case "rival":
+      return "rival";
+    case "enemy":
+      return "enemy";
+    case "frenemy":
+      return "frenemy";
+    case "betrayed":
+      return "betrayed";
+    case "traitor":
+      return "traitor";
+    case "on_bad_terms":
+      return "on_bad_terms";
+    case "complicated":
+      return "complicated";
     case "family":
     case "parent":
     case "child":

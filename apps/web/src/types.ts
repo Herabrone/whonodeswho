@@ -19,7 +19,6 @@ export type {
   RelationshipEpisode,
   RelationshipEvent,
   RelationshipPhase,
-  RelationshipPhaseSource,
   RelationshipHistoryGraphData,
   RelationshipHistoryPersistedState,
   RelationshipInput,
