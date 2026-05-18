@@ -1,0 +1,6 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "commit_message": {
+    "prompt": "Should generate commits with the following tag:\n\nADDED:\nCHANGED:\nREMOVED:\nIMPLEMENTED:\netc\n\nFollowed by a consise atomic description of what was changed"
+  }
+}

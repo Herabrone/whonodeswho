@@ -52,6 +52,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
   const layoutMode = useGraphStore((s) => s.layoutMode);
   const treeShape = useGraphStore((s) => s.treeShape);
   const treeRootId = useGraphStore((s) => s.treeRootId);
+  const familyAwareLayered = useGraphStore((s) => s.familyAwareLayered);
   const selectedPersonId = useGraphStore((s) => s.selectedPersonId);
   const persistenceError = useGraphStore((s) => s.persistenceError);
   const recoveryDraft = useGraphStore((s) => s.recoveryDraft);
@@ -59,6 +60,7 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
   const setLayoutMode = useGraphStore((s) => s.setLayoutMode);
   const setTreeShape = useGraphStore((s) => s.setTreeShape);
   const setTreeRoot = useGraphStore((s) => s.setTreeRoot);
+  const setFamilyAwareLayered = useGraphStore((s) => s.setFamilyAwareLayered);
   const restoreRecoveryDraft = useGraphStore((s) => s.restoreRecoveryDraft);
   const discardRecoveryDraft = useGraphStore((s) => s.discardRecoveryDraft);
   const clearPersistenceError = useGraphStore((s) => s.clearPersistenceError);
@@ -161,6 +163,24 @@ export function AppShell({ canvas, overlays }: AppShellProps) {
                         </span>
                       </button>
                     ))}
+                    {treeShape === "layered" ? (
+                      <div className="mt-1 border-t border-rf-border px-4 py-3">
+                        <label className="flex cursor-pointer items-start gap-3 text-left">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 rounded border-rf-border text-rf-accent focus:ring-rf-accent"
+                            checked={familyAwareLayered}
+                            onChange={(event) => setFamilyAwareLayered(event.target.checked)}
+                          />
+                          <span className="flex flex-col">
+                            <span className="text-sm font-semibold text-rf-text">Family-aware layered tree</span>
+                            <span className="mt-1 text-xs leading-relaxed text-rf-muted">
+                              Use semantic family generations first, then keep non-family branches in the existing tree flow.
+                            </span>
+                          </span>
+                        </label>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               )}

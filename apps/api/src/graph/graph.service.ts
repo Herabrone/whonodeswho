@@ -23,6 +23,7 @@ const EMPTY_STATE: PersistedState = {
     layoutMode: 'free',
     treeShape: 'grouped',
     treeRootId: null,
+    familyAwareLayered: true,
   },
 };
 
@@ -61,6 +62,7 @@ export class GraphService {
         layoutMode: user.layoutMode as LayoutMode,
         treeShape: user.treeShape as TreeShape,
         treeRootId: user.treeRootId,
+        familyAwareLayered: true,
       },
     };
   }
@@ -252,7 +254,9 @@ export class GraphService {
       !!candidate.positions &&
       !!candidate.layout &&
       typeof candidate.layout.layoutMode === 'string' &&
-      typeof candidate.layout.treeShape === 'string'
+      typeof candidate.layout.treeShape === 'string' &&
+      (candidate.layout.familyAwareLayered === undefined ||
+        typeof candidate.layout.familyAwareLayered === 'boolean')
     );
   }
 

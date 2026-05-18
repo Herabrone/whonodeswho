@@ -19,8 +19,11 @@ import {
   computeRadialCategoryLabels,
   computeTreeLayout,
   isTreePrimaryEdge,
+  type TreeEdgeRole,
 } from "./layout";
 import { computeCategoryTree } from "./treeLayout";
+import { buildFamilyGenerationLayout } from "./familyGenerationLayout";
+import { computeHybridFamilyLayeredLayout } from "./hybridFamilyLayeredLayout";
 import type { CategoryNodeData } from "./CategoryNode";
 
 export interface PersonNodeData extends Record<string, unknown> {
@@ -64,6 +67,7 @@ export function useGraphView(): GraphView {
   const layoutMode = useGraphStore((s) => s.layoutMode);
   const treeShape = useGraphStore((s) => s.treeShape);
   const treeRootId = useGraphStore((s) => s.treeRootId);
+  const familyAwareLayered = useGraphStore((s) => s.familyAwareLayered);
   const timelineOpen = useGraphStore((s) => s.timelineOpen);
   const timelineYear = useGraphStore((s) => s.timelineYear);
 
@@ -399,11 +403,24 @@ export function useGraphView(): GraphView {
       };
     }
 
-    const treeStructure = treeActive ? buildTreeStructure(viewGraph, treeRootId!) : null;
-    const treePositions =
-      treeActive && treeRootId && treeShape !== "grouped"
-        ? computeTreeLayout(viewGraph, treeRootId, treeShape)
+    const familyLayout =
+      treeActive &&
+      treeRootId &&
+      treeShape === "layered" &&
+      familyAwareLayered
+        ? buildFamilyGenerationLayout(viewGraph.people, viewGraph.relationships, treeRootId)
         : null;
+    const hybridTreeLayout =
+      treeActive && treeRootId && treeShape === "layered" && familyLayout?.hasFamily
+        ? computeHybridFamilyLayeredLayout(viewGraph, treeRootId, familyLayout)
+        : null;
+    const treeStructure = hybridTreeLayout?.treeStructure ?? (treeActive ? buildTreeStructure(viewGraph, treeRootId!) : null);
+    const treePositions =
+      hybridTreeLayout?.positions ??
+      (treeActive && treeRootId && treeShape !== "grouped"
+        ? computeTreeLayout(viewGraph, treeRootId, treeShape)
+        : null);
+    const treeEdgeRoles = hybridTreeLayout?.edgeRoleById ?? null;
 
     const query = searchQuery.trim().toLowerCase();
     const visible = new Set(visibleCategories);
@@ -419,18 +436,37 @@ export function useGraphView(): GraphView {
       .filter((r) => !(hideWeak && WEAK_RELATIONSHIP_TYPES.has(r.type)))
       .flatMap((r) => {
         const onPath = pathEdgeSet.has(r.id);
+        const treeEdgeRole: TreeEdgeRole | null =
+          treeEdgeRoles?.get(r.id) ??
+          (treeActive && treeStructure
+            ? isTreePrimaryEdge(treeStructure, r.source, r.target)
+              ? "bfs-primary"
+              : "secondary"
+            : null);
         const secondary =
-          treeActive && treeStructure
-            ? !isTreePrimaryEdge(treeStructure, r.source, r.target)
-            : false;
+          treeEdgeRole === "family-secondary" || treeEdgeRole === "secondary";
         const dimmed =
           (focusSet !== null &&
             !(focusSet.has(r.source) && focusSet.has(r.target))) ||
           (pathPersonIds.length > 0 && !onPath);
         const color = r.color ?? relationshipColors[r.category];
         const baseOpacity = dimmed ? 0.12 : 1;
-        const opacity = secondary && !dimmed ? 0.4 : baseOpacity;
-        const strokeWidth = secondary && !onPath ? 1.4 : onPath ? 4 : 2;
+        const opacity =
+          treeEdgeRole === "family-secondary" && !dimmed
+            ? 0.32
+            : secondary && !dimmed
+              ? 0.4
+              : baseOpacity;
+        const strokeWidth =
+          treeEdgeRole === "family-primary" && !onPath
+            ? 2.6
+            : treeEdgeRole === "family-secondary" && !onPath
+              ? 1.2
+              : secondary && !onPath
+                ? 1.4
+                : onPath
+                  ? 4
+                  : 2;
         const timelineView = timelineViewById.get(r.id);
         const timelineState = timelineView?.state;
         const endedLike = timelineState?.visibility === "ended" || timelineState?.visibility === "dormant";
@@ -443,11 +479,15 @@ export function useGraphView(): GraphView {
               strokeDasharray: graphTokens.edge.endedDash,
             }
           : {
-              stroke: timelineState?.displayColor ?? color,
+              stroke:
+                treeEdgeRole === "family-primary"
+                  ? relationshipColors.family
+                  : timelineState?.displayColor ?? color,
               strokeWidth: timelineState?.edgeStyle === "multi"
                 ? Math.max(strokeWidth, graphTokens.edge.widthSelected)
                 : strokeWidth,
               opacity,
+              strokeDasharray: treeEdgeRole === "family-secondary" ? "6 4" : undefined,
             };
 
         return [{
@@ -463,6 +503,7 @@ export function useGraphView(): GraphView {
             layoutMode,
             treeShape,
             secondary,
+            treeEdgeRole,
             timelineState,
             relationshipIds: timelineView?.relationshipIds ?? [r.id],
           },
@@ -645,6 +686,7 @@ export function useGraphView(): GraphView {
     layoutMode,
     treeShape,
     treeRootId,
+    familyAwareLayered,
     timelineOpen,
     timelineYear,
   ]);

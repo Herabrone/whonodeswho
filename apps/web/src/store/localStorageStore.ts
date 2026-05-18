@@ -37,6 +37,8 @@ export class LocalStorageStore implements RelationshipStore {
           treeShape: parsed.layout?.treeShape ?? EMPTY_STATE.layout.treeShape,
           treeRootId:
             parsed.layout?.treeRootId ?? EMPTY_STATE.layout.treeRootId,
+          familyAwareLayered:
+            parsed.layout?.familyAwareLayered ?? EMPTY_STATE.layout.familyAwareLayered,
         },
       };
     } catch (err) {

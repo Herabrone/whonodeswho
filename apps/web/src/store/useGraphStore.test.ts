@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useGraphStore } from "./useGraphStore";
 
-// Minimal mock for persistence
 const mockStore = {
   load: vi.fn(),
   save: vi.fn(),
@@ -22,9 +21,18 @@ vi.mock("./localStorageStore", () => ({
   createDraftStore: () => mockDraftStore,
 }));
 
+function persistedLayout(overrides: Record<string, unknown> = {}) {
+  return {
+    layoutMode: "free",
+    treeShape: "grouped",
+    treeRootId: null,
+    familyAwareLayered: true,
+    ...overrides,
+  };
+}
+
 describe("useGraphStore http persistence", () => {
   beforeEach(() => {
-    // Reset Zustand store state manually if needed, or rely on signOut()
     useGraphStore.getState().signOut();
     vi.clearAllMocks();
     mockDraftStore.load.mockResolvedValue(null);
@@ -34,7 +42,7 @@ describe("useGraphStore http persistence", () => {
     const mockData = {
       graph: { people: [{ id: "p1", name: "Alice" }], relationships: [] },
       positions: { p1: { x: 0, y: 0 } },
-      layout: { layoutMode: "free", treeShape: "radial", treeRootId: null },
+      layout: persistedLayout({ treeShape: "radial", familyAwareLayered: false }),
     };
     mockStore.load.mockResolvedValueOnce(mockData);
 
@@ -44,7 +52,20 @@ describe("useGraphStore http persistence", () => {
     expect(s.hydrated).toBe(true);
     expect(s.people).toHaveLength(1);
     expect(s.people[0].name).toBe("Alice");
+    expect(s.familyAwareLayered).toBe(false);
     expect(s._persistence).toBe(mockStore);
+  });
+
+  it("defaults familyAwareLayered to true for older persisted layouts", async () => {
+    mockStore.load.mockResolvedValueOnce({
+      graph: { people: [], relationships: [] },
+      positions: {},
+      layout: { layoutMode: "free", treeShape: "grouped", treeRootId: null },
+    } as any);
+
+    await useGraphStore.getState().hydrate("user-1");
+
+    expect(useGraphStore.getState().familyAwareLayered).toBe(true);
   });
 
   it("routes saves through the assigned persistence instance", async () => {
@@ -52,18 +73,39 @@ describe("useGraphStore http persistence", () => {
     mockStore.load.mockResolvedValueOnce({
       graph: { people: [], relationships: [] },
       positions: {},
-      layout: { layoutMode: "free", treeShape: "grouped", treeRootId: null },
+      layout: persistedLayout(),
     });
 
     await useGraphStore.getState().hydrate("user-1");
-    
-    // Trigger a change
     useGraphStore.getState().addPerson({ name: "Bob" });
-
-    // Fast-forward debounce timer (400ms)
     vi.advanceTimersByTime(500);
 
     expect(mockStore.save).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("persists familyAwareLayered changes through the assigned persistence instance", async () => {
+    vi.useFakeTimers();
+    mockStore.load.mockResolvedValueOnce({
+      graph: { people: [], relationships: [] },
+      positions: {},
+      layout: persistedLayout({
+        layoutMode: "tree",
+        treeShape: "layered",
+      }),
+    });
+
+    await useGraphStore.getState().hydrate("user-1");
+    useGraphStore.getState().setFamilyAwareLayered(false);
+    vi.advanceTimersByTime(500);
+
+    expect(mockStore.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        layout: expect.objectContaining({
+          familyAwareLayered: false,
+        }),
+      }),
+    );
     vi.useRealTimers();
   });
 
@@ -71,7 +113,7 @@ describe("useGraphStore http persistence", () => {
     mockStore.load.mockResolvedValueOnce({
       graph: { people: [{ id: "p1", name: "Alice" }], relationships: [] },
       positions: {},
-      layout: { layoutMode: "free", treeShape: "grouped", treeRootId: null },
+      layout: persistedLayout(),
     });
 
     await useGraphStore.getState().hydrate("user-1");
@@ -90,7 +132,7 @@ describe("useGraphStore http persistence", () => {
     mockStore.load.mockResolvedValueOnce({
       graph: { people: [], relationships: [] },
       positions: {},
-      layout: { layoutMode: "free", treeShape: "grouped", treeRootId: null },
+      layout: persistedLayout(),
     });
 
     await useGraphStore.getState().hydrate("user-1");
@@ -108,7 +150,7 @@ describe("useGraphStore http persistence", () => {
     mockStore.load.mockResolvedValueOnce({
       graph: { people: [], relationships: [] },
       positions: {},
-      layout: { layoutMode: "free", treeShape: "grouped", treeRootId: null },
+      layout: persistedLayout(),
     });
     mockStore.save.mockRejectedValueOnce(new Error("boom"));
 
@@ -128,7 +170,7 @@ describe("useGraphStore http persistence", () => {
           relationships: [],
         },
         positions: {},
-        layout: { layoutMode: "free", treeShape: "grouped", treeRootId: null },
+        layout: persistedLayout(),
       },
       updatedAt: "2024-03-01T00:00:00.000Z",
       reason: "unauthorized" as const,
@@ -136,7 +178,7 @@ describe("useGraphStore http persistence", () => {
     mockStore.load.mockResolvedValueOnce({
       graph: { people: [], relationships: [] },
       positions: {},
-      layout: { layoutMode: "free", treeShape: "grouped", treeRootId: null },
+      layout: persistedLayout(),
     });
     mockDraftStore.load.mockResolvedValueOnce(recoveryDraft);
 
@@ -153,7 +195,7 @@ describe("useGraphStore http persistence", () => {
           relationships: [],
         },
         positions: {},
-        layout: { layoutMode: "free", treeShape: "grouped", treeRootId: null },
+        layout: persistedLayout(),
       },
       updatedAt: "2024-03-01T00:00:00.000Z",
       reason: "network" as const,
@@ -161,7 +203,7 @@ describe("useGraphStore http persistence", () => {
     mockStore.load.mockResolvedValueOnce({
       graph: { people: [], relationships: [] },
       positions: {},
-      layout: { layoutMode: "free", treeShape: "grouped", treeRootId: null },
+      layout: persistedLayout(),
     });
     mockDraftStore.load.mockResolvedValueOnce(recoveryDraft);
 
