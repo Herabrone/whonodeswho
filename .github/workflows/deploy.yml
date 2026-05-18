@@ -1,0 +1,22 @@
+name: Deploy WhoNodesWho
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 5.75.168.19
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /root/whonodeswho
+            chmod +x ./deploy.sh
+            ./deploy.sh /root/whonodeswho

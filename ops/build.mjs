@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = dirname(__dirname);
+const API_DIR = join(ROOT_DIR, "apps", "api");
 
 const FRONTEND_PORT = 3005;
 const API_PORT = 3000;
@@ -22,6 +30,103 @@ function log(message) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function checkEnvironment() {
+  log("Checking environment setup...");
+
+  // Check Node.js
+  try {
+    const nodeVersion = execSync("node --version", { encoding: "utf8" });
+    log(`Node.js: ${nodeVersion.trim()}`);
+  } catch {
+    throw new Error("Node.js is not installed. Please install Node.js from https://nodejs.org");
+  }
+
+  // Check npm
+  try {
+    const npmVersion = execSync("npm --version", { encoding: "utf8" });
+    log(`npm: ${npmVersion.trim()}`);
+  } catch {
+    throw new Error("npm is not installed. Please install npm.");
+  }
+}
+
+async function setupDependencies() {
+  const nodeModulesExists = existsSync(join(ROOT_DIR, "node_modules"));
+  const apiNodeModulesExists = existsSync(join(API_DIR, "node_modules"));
+
+  if (!nodeModulesExists || !apiNodeModulesExists) {
+    log("Installing dependencies (this may take a few minutes on first install)...");
+    try {
+      execSync("npm install", {
+        cwd: ROOT_DIR,
+        stdio: "inherit",
+        shell: isWindows,
+      });
+      log("Dependencies installed successfully.");
+    } catch (error) {
+      throw new Error("Failed to install dependencies");
+    }
+  } else {
+    log("Dependencies already installed.");
+  }
+}
+
+async function setupDatabase() {
+  log("Setting up database...");
+
+  // Check for .env file
+  const envPath = join(API_DIR, ".env");
+  if (!existsSync(envPath)) {
+    log("Creating .env file with default DATABASE_URL (SQLite)...");
+    const dbPath = join(API_DIR, "prisma", "dev.db");
+    const envContent = `DATABASE_URL="file:./prisma/dev.db"\nPORT=${API_PORT}\nNODE_ENV=development\n`;
+    
+    try {
+      const fs = await import("node:fs/promises");
+      await fs.writeFile(envPath, envContent);
+      log(".env file created.");
+    } catch (error) {
+      throw new Error("Failed to create .env file");
+    }
+  } else {
+    log(".env file already exists.");
+  }
+
+  // Generate Prisma client
+  try {
+    log("Generating Prisma client...");
+    execSync("npm run prisma:generate", {
+      cwd: API_DIR,
+      stdio: "inherit",
+      shell: isWindows,
+    });
+  } catch (error) {
+    throw new Error("Failed to generate Prisma client");
+  }
+
+  // Push Prisma schema
+  try {
+    log("Pushing database schema (creating/updating database)...");
+    execSync("npm run prisma:push", {
+      cwd: API_DIR,
+      stdio: ["pipe", "inherit", "inherit"],
+      shell: isWindows,
+    });
+  } catch (error) {
+    throw new Error("Failed to push database schema");
+  }
+
+  log("Database setup complete.");
+}
+
+async function initializeOnFirstRun() {
+  log("Running first-time initialization...");
+  await checkEnvironment();
+  await setupDependencies();
+  await setupDatabase();
+  log("Initialization complete!");
 }
 
 function collectPidsFromPort(port) {
@@ -290,6 +395,8 @@ function waitForExit(api, web) {
 
 (async () => {
   try {
+    await initializeOnFirstRun();
+    
     if (mode === "dev") {
       await bootDev();
       return;
