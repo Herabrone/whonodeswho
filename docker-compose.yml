@@ -1,0 +1,11 @@
+services:
+  whonodeswho-web:
+    build: .
+    container_name: whonodeswho-web
+    restart: unless-stopped
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
