@@ -170,12 +170,72 @@ function relationshipPhaseToDraft(phase: RelationshipPhase): RelationshipPhaseDr
   };
 }
 
-function createRelationshipPhaseDraft(): RelationshipPhaseDraft {
+function createRelationshipPhaseDraft(
+  seed?: Pick<RelationshipPhaseDraft, "fromYear" | "fromMonth" | "toYear" | "toMonth" | "isCurrent">,
+): RelationshipPhaseDraft {
   return {
     id: newId(),
     typeKey: "",
-    isCurrent: true,
+    fromYear: seed?.fromYear,
+    fromMonth: seed?.fromMonth,
+    toYear: seed?.toYear,
+    toMonth: seed?.toMonth,
+    isCurrent: seed?.isCurrent ?? true,
   };
+}
+
+function initialRelationshipPhaseDrafts(relationship?: Relationship): RelationshipPhaseDraft[] {
+  if (!relationship) return [];
+
+  const existingPhases = relationship.phases?.map(relationshipPhaseToDraft) ?? [];
+  if (existingPhases.length > 0) {
+    return existingPhases;
+  }
+
+  return [
+    {
+      id: newId(),
+      typeKey: encodePhaseTypeKey(relationship.category, relationship.type),
+      fromYear: relationship.startYear,
+      fromMonth: relationship.startMonth,
+      isCurrent: true,
+    },
+  ];
+}
+
+function appendRelationshipPhaseDraft(phases: RelationshipPhaseDraft[]): RelationshipPhaseDraft[] {
+  if (phases.length === 0) {
+    return [...phases, createRelationshipPhaseDraft()];
+  }
+
+  const sorted = sortRelationshipPhaseDrafts(phases);
+  const latest = sorted[sorted.length - 1];
+
+  if (latest.isCurrent) {
+    const updated = sorted.map((phase) =>
+      phase.id === latest.id
+        ? {
+            ...phase,
+            isCurrent: false,
+            toYear: undefined,
+            toMonth: undefined,
+          }
+        : phase,
+    );
+    return [...updated, createRelationshipPhaseDraft()];
+  }
+
+  if (latest.toYear !== undefined) {
+    return [
+      ...sorted,
+      createRelationshipPhaseDraft({
+        fromYear: latest.toYear,
+        fromMonth: latest.toMonth,
+      }),
+    ];
+  }
+
+  return [...sorted, createRelationshipPhaseDraft()];
 }
 
 function isRelationshipPhaseDraftBlank(phase: RelationshipPhaseDraft): boolean {
@@ -371,7 +431,7 @@ function initialRelationshipDraft(relationship?: Relationship): RelationshipDraf
     startMonth: relationship?.startMonth,
     endYear: relationship?.endYear,
     isEnded: relationship?.isActive === false || relationship?.endYear !== undefined,
-    phases: relationship?.phases?.map(relationshipPhaseToDraft) ?? [],
+    phases: initialRelationshipPhaseDrafts(relationship),
     color: relationship?.color ?? "",
     notes: relationship?.notes ?? "",
   });
@@ -2070,12 +2130,7 @@ export function CrudFeature() {
 
                   <button
                     type="button"
-                    onClick={() =>
-                      updateRelationshipHistoryDraft((phases) => [
-                        ...phases,
-                        createRelationshipPhaseDraft(),
-                      ])
-                    }
+                    onClick={() => updateRelationshipHistoryDraft(appendRelationshipPhaseDraft)}
                     className="mt-3 rounded-lg border border-rf-border bg-rf-surface px-3 py-2 text-sm text-rf-text hover:bg-rf-base"
                   >
                     + Add phase
