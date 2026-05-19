@@ -171,7 +171,7 @@ function relationshipPhaseToDraft(phase: RelationshipPhase): RelationshipPhaseDr
 }
 
 function createRelationshipPhaseDraft(
-  seed?: Pick<RelationshipPhaseDraft, "fromYear" | "fromMonth" | "toYear" | "toMonth" | "isCurrent">,
+  seed?: Partial<Pick<RelationshipPhaseDraft, "fromYear" | "fromMonth" | "toYear" | "toMonth" | "isCurrent">>,
 ): RelationshipPhaseDraft {
   return {
     id: newId(),

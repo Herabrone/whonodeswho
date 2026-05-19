@@ -37,10 +37,6 @@ export function TransitionDatePicker({
     onDateChange(year, newMonth, day);
   };
 
-  const handleDayChange = (newDay: number) => {
-    onDateChange(year, month, newDay);
-  };
-
   const handleNativeDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.value) return;
     const date = new Date(e.target.value);

@@ -241,5 +241,23 @@ export const TRANSITION_MAP: Record<EpisodeKind, TransitionOption[]> = {
 
   ex_partner: [],
 
+  estranged: [],
+
+  no_contact: [],
+
+  rival: [],
+
+  enemy: [],
+
+  frenemy: [],
+
+  betrayed: [],
+
+  traitor: [],
+
+  on_bad_terms: [],
+
+  complicated: [],
+
   custom: [],
 };

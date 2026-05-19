@@ -41,14 +41,6 @@ function proposalArgsForPair(a: string, b: string, evidence: Fact[]): [string, s
   return primaryParticipant === a ? [a, b] : [b, a];
 }
 
-function hasAnyRelationshipBetween(known: Fact[], first: string, second: string): boolean {
-  return known.some(
-    (fact) =>
-      (fact.args[0] === first && fact.args[1] === second) ||
-      (fact.args[0] === second && fact.args[1] === first),
-  );
-}
-
 function friendFacts(known: Fact[]): Fact[] {
   return known.filter((fact) => fact.predicate === "friend" && fact.derivationDepth === 0);
 }

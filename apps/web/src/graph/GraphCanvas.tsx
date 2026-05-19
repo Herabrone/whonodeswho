@@ -21,7 +21,6 @@ import {
   type NodeMouseHandler,
   type EdgeMouseHandler,
 } from "@xyflow/react";
-import { Hand, MousePointer } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 import { PersonNode } from "./PersonNode";
 import { useGraphView } from "./useGraphView";
@@ -682,7 +681,12 @@ export function GraphCanvas() {
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <Hand size={16} />
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 11V5a1 1 0 0 1 2 0v6" />
+            <path d="M10 11V4a1 1 0 0 1 2 0v7" />
+            <path d="M13 11V5a1 1 0 0 1 2 0v6" />
+            <path d="M16 11v-3a1 1 0 1 1 2 0v6a7 7 0 0 1-7 7h-1a5 5 0 0 1-5-5v-5a1 1 0 1 1 2 0v2" />
+          </svg>
         </button>
         <button
           type="button"
@@ -713,7 +717,9 @@ export function GraphCanvas() {
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <MousePointer size={16} />
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 3l7 17 2-7 7-2L4 3z" />
+          </svg>
         </button>
       </Panel>
       <MinimapContainer nodes={nodes} edges={edges} />
